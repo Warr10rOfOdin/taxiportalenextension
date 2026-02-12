@@ -1,0 +1,403 @@
+The goal is to create a live operational wallboard for Voss Taxi by reading data directly from the visible table in Taxiportalen (since the Taxi4u API is not working reliably).
+
+This extension must:
+
+Read booking data directly from the page DOM.
+
+Normalize and process that data.
+
+Display a dark-mode overlay on top of the page.
+
+Provide visual highlights and audio alerts.
+
+Handle merged bookings via ALTTURID.
+
+Maintain strict sorting rules.
+
+Operate without calling external APIs.
+
+This extension must work without any backend.
+
+2. Why We Are Using a Chrome Extension
+
+The Taxi4u API is not usable. Therefore:
+
+All data must be extracted from the visible HTML table on the page.
+
+No external API calls are allowed.
+
+The extension must parse the DOM.
+
+The Taxiportalen page already updates bookings dynamically, so the extension must observe and react to DOM changes.
+
+3. Source Page Structure
+
+The page TripViewCentral.aspx contains a large HTML table displaying bookings.
+
+Columns include:
+
+TAXI
+
+STATUS
+
+UTROP
+
+OPPMOTE
+
+BEHANDLINGSTID
+
+FRA
+
+TIL
+
+NAVN
+
+MELDING TIL BIL
+
+TLF
+
+EGENSKAP
+
+ALTTURID
+
+The extension must not assume fixed column indexes.
+
+Instead, it must:
+
+Locate the header row.
+
+Read header text.
+
+Map header names → column index dynamically.
+
+Parse each row accordingly.
+
+This prevents breakage if column order changes.
+
+4. Required Booking Fields
+
+Each parsed booking must be normalized into:
+
+{
+  id: unique identifier,
+  taxi: string,
+  status: string,
+  utrop: Date,
+  oppmote: Date,
+  behandlingstid: string,
+  fra: string,
+  til: string,
+  navn: string,
+  meldingTilBil: string,
+  tlf: string,
+  eigenskap: string,
+  altturid: string
+}
+
+
+Unique ID should use:
+
+TURID if available
+
+Otherwise combination of key fields (UTROP + TAXI + FRA etc.)
+
+5. Time Rules
+
+All time must use:
+
+24-hour format
+
+No AM/PM
+
+The overlay must only show bookings where:
+
+OPPMOTE between (now - 24h) and (now + 24h)
+
+
+Older entries must be removed from display.
+
+6. Sorting Rules (Strict)
+
+The list must:
+
+Be sorted ONLY by UTROP ascending.
+
+Never sort by status.
+
+Never rearrange by active/completed.
+
+The only allowed structural grouping is:
+
+Group rows that share the same ALTTURID.
+
+Even then:
+
+Individual rows must remain separate.
+
+They must simply appear adjacent.
+
+7. ALTTURID (Merged Trips)
+
+If multiple bookings share the same ALTTURID:
+
+They must be displayed together.
+
+They must have a subtle visual grouping (left border or group indicator).
+
+They must remain individually visible.
+
+If ANY booking in a group is active:
+
+The entire group must appear active (not dimmed).
+
+8. Status Handling
+
+Statuses include:
+
+UNDER SENDING
+
+JA-SVAR
+
+KLAR FOR FAKTURERING
+
+KONTANT
+
+KREDITT
+
+ENDRET
+
+BEH.MANUELT
+
+ADD-ONS
+
+Behavior:
+
+UNDER SENDING:
+
+Red pulse animation.
+
+Audio chime every 30 seconds while present.
+
+JA-SVAR:
+
+Accepted mission.
+
+Dimmed but readable.
+
+KLAR FOR FAKTURERING:
+
+Completed.
+
+Dimmed but readable.
+
+BEH.MANUELT:
+
+Active/manual.
+
+Not dimmed.
+
+ADD-ONS:
+
+Belongs to ALTTURID group.
+
+9. Upcoming Highlight
+
+A booking must glow yellow when:
+
+UTROP is within 5 minutes of current time.
+
+
+The glow must stop once UTROP has passed.
+
+10. Audio Rules
+
+Two sound types:
+
+UTROP Chime
+
+Rules:
+
+Must trigger only once per booking.
+
+Only triggers at whole 5-minute intervals.
+
+Example:
+
+If UTROP is:
+10:00–10:04 → chime at 10:00
+16:35–16:39 → chime at 16:35
+
+Implementation:
+
+bucket = floor(minutes / 5) * 5
+
+
+Each booking must store whether it has already chimed.
+
+UNDER SENDING Chime
+
+Rules:
+
+Plays every 30 seconds.
+
+Only if at least one booking has status UNDER SENDING.
+
+Stops when none remain.
+
+11. Scroll Behavior
+
+Users must be able to scroll freely.
+
+If:
+
+No scroll interaction occurs for 30 seconds,
+
+Then:
+
+Overlay auto-scrolls back to the first active booking
+(upcoming OR under sending OR manual).
+
+Completed bookings (JA-SVAR, KLAR FOR FAKTURERING) must not prevent scroll reset.
+
+12. DOM Change Detection
+
+The extension must detect changes by:
+
+Primary:
+
+Using MutationObserver on the table.
+
+Secondary fallback:
+
+Polling parse every 3–5 seconds.
+
+On change:
+
+Re-parse the table.
+
+Normalize data.
+
+Diff with previous state.
+
+Update overlay accordingly.
+
+13. UI Design Requirements
+
+Overlay must:
+
+Be dark mode.
+
+Fixed position.
+
+Cover full viewport.
+
+Not modify original Taxiportalen DOM.
+
+Be toggleable.
+
+Visual style:
+
+Large readable fonts.
+
+Clear UTROP emphasis.
+
+Yellow glow for upcoming.
+
+Red pulse for UNDER SENDING.
+
+Subtle group indicator for ALTTURID.
+
+Dim completed rows.
+
+24h format time.
+
+Top statistics bar:
+
+Total missions shown
+
+Under sending count
+
+Upcoming count
+
+14. Chrome Extension Architecture
+
+Manifest v3:
+
+{
+  "manifest_version": 3,
+  "name": "Voss Taxi Wallboard Overlay",
+  "version": "1.0",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://taxiportalen.no/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://taxiportalen.no/TripViewCentral.aspx*"],
+      "js": ["content.js"],
+      "css": ["overlay.css"]
+    }
+  ]
+}
+
+15. File Structure
+extension/
+  manifest.json
+  content.js
+  overlay.css
+  sounds/
+    utrop-chime.wav
+    undersending-chime.wav
+
+
+No backend required.
+
+16. Performance Constraints
+
+Must handle 100+ bookings smoothly.
+
+Must not cause visible lag.
+
+Must avoid constant full re-renders.
+
+Must diff old vs new dataset.
+
+17. Security Constraints
+
+Must not send booking data anywhere.
+
+Must not log sensitive data to console in production.
+
+Must not break Taxiportalen functionality.
+
+18. Risks
+
+If Taxiportalen changes:
+
+Table structure
+
+Header names
+
+DOM hierarchy
+
+Parser must be updated.
+
+DOM-as-API is inherently brittle compared to real API.
+
+19. Final Goal
+
+A stable Chrome extension overlay that:
+
+Reads live booking data from Taxiportalen DOM.
+
+Displays a readable dark-mode wallboard.
+
+Handles merged trips properly.
+
+Alerts dispatch with precise audio timing.
+
+Maintains strict UTROP sorting.
+
+Automatically resets scroll.
+
+Works without Taxi4u API.
