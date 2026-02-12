@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 280px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0b0e14;
+      color: #d4d8e0;
+      padding: 16px;
+    }
+    h1 {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: #f0f2f5;
+    }
+    h1 span { color: #fbbf24; }
+    .subtitle {
+      font-size: 11px;
+      color: #6b7a94;
+      margin-bottom: 16px;
+    }
+    .section {
+      margin-bottom: 14px;
+    }
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #6b7a94;
+      margin-bottom: 6px;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      font-size: 13px;
+      border-bottom: 1px solid #1e2536;
+    }
+    .info-row:last-child { border-bottom: none; }
+    .badge {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge-ok {
+      background: rgba(34, 197, 94, 0.15);
+      color: #86efac;
+    }
+    .badge-warn {
+      background: rgba(249, 115, 22, 0.15);
+      color: #fdba74;
+    }
+    .link {
+      display: block;
+      text-align: center;
+      margin-top: 12px;
+      font-size: 12px;
+      color: #60a5fa;
+      text-decoration: none;
+    }
+    .link:hover { text-decoration: underline; }
+    .footer {
+      margin-top: 16px;
+      text-align: center;
+      font-size: 10px;
+      color: #374151;
+    }
+  </style>
+</head>
+<body>
+  <h1>Voss <span>Taxi</span> Wallboard</h1>
+  <p class="subtitle">Live dispatch overlay for Taxiportalen</p>
+
+  <div class="section">
+    <div class="section-title">Status</div>
+    <div class="info-row">
+      <span>Extension</span>
+      <span class="badge badge-ok">Active</span>
+    </div>
+    <div class="info-row">
+      <span>Version</span>
+      <span>1.0.0</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Usage</div>
+    <div class="info-row">
+      <span>Toggle overlay</span>
+      <span style="color:#fbbf24;font-weight:600;">VT button</span>
+    </div>
+    <div class="info-row">
+      <span>Mute audio</span>
+      <span>Sound button</span>
+    </div>
+    <div class="info-row">
+      <span>Filter bookings</span>
+      <span>Filter bar</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Notes</div>
+    <div style="font-size:12px;color:#6b7a94;line-height:1.5;">
+      Open <strong style="color:#d4d8e0;">TripViewCentral.aspx</strong> on Taxiportalen to activate the wallboard. The overlay reads data directly from the page — no API calls are made.
+    </div>
+  </div>
+
+  <div class="footer">Voss Taxi Wallboard v1.0.0</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
