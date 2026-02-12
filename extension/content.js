@@ -1,5 +1,5 @@
 // ============================================================
-//  Voss Taxi Wallboard — Content Script
+//  Voss Taxi Wallboard — Content Script  v1.1
 //  Reads booking data from Taxiportalen DOM and renders a
 //  dark-mode dispatch wallboard overlay.
 // ============================================================
@@ -16,6 +16,7 @@
   const UPCOMING_MINUTES = 5;
   const TIME_WINDOW_HOURS = 24;
   const UTROP_BUCKET_SIZE = 5;
+  const MUTATION_DEBOUNCE_MS = 300;
 
   // Recognised column names → normalised keys
   const COLUMN_MAP = {
@@ -55,20 +56,28 @@
     'ADD-ONS': 'add-ons',
   };
 
+  const WEEKDAYS_NO = ['Sondag', 'Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lordag'];
+  const MONTHS_NO = ['jan', 'feb', 'mar', 'apr', 'mai', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'des'];
+
   // ----------------------------------------------------------
   //  State
   // ----------------------------------------------------------
   let bookings = [];
+  let previousBookingIds = new Set();
   let previousBookingsJSON = '';
-  let chimePlayed = new Set();       // booking ids that already chimed
+  let chimePlayed = new Set();
   let lastScrollTime = Date.now();
   let overlayVisible = true;
   let muted = false;
   let searchQuery = '';
-  let activeFilter = 'all';          // all | active | sending | upcoming | completed
+  let activeFilter = 'all';
   let underSendingInterval = null;
+  let mutationTimer = null;
+  let lastParseTime = 0;
+  let parseCount = 0;
+  let tableFound = false;
 
-  // Audio context (created on first interaction)
+  // Audio context (created on first user interaction)
   let audioCtx = null;
 
   // ----------------------------------------------------------
@@ -79,14 +88,20 @@
   function pad(n) { return String(n).padStart(2, '0'); }
 
   function formatTime24(date) {
-    if (!(date instanceof Date) || isNaN(date)) return '—';
+    if (!(date instanceof Date) || isNaN(date)) return '\u2014';
     return pad(date.getHours()) + ':' + pad(date.getMinutes());
+  }
+
+  function formatDate(date) {
+    return WEEKDAYS_NO[date.getDay()] + ' ' +
+      date.getDate() + '. ' + MONTHS_NO[date.getMonth()] + ' ' +
+      date.getFullYear();
   }
 
   function parseTimeString(str) {
     if (!str || typeof str !== 'string') return null;
     str = str.trim();
-    // Try multiple formats: "HH:MM", "HH:MM:SS", "DD.MM.YYYY HH:MM", etc.
+    // Try: "DD.MM.YYYY HH:MM(:SS)"
     let match = str.match(/(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
     if (match) {
       let year = parseInt(match[3], 10);
@@ -94,6 +109,7 @@
       return new Date(year, parseInt(match[2], 10) - 1, parseInt(match[1], 10),
         parseInt(match[4], 10), parseInt(match[5], 10), parseInt(match[6] || 0, 10));
     }
+    // Try: "HH:MM(:SS)"
     match = str.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
     if (match) {
       const d = new Date();
@@ -108,7 +124,7 @@
   }
 
   function isWithinWindow(date) {
-    if (!date) return true; // keep if we can't parse
+    if (!date) return true;
     const n = now();
     const lo = new Date(n.getTime() - TIME_WINDOW_HOURS * 3600000);
     const hi = new Date(n.getTime() + TIME_WINDOW_HOURS * 3600000);
@@ -133,8 +149,20 @@
     return Math.floor(mins / UTROP_BUCKET_SIZE) * UTROP_BUCKET_SIZE;
   }
 
+  function esc(s) {
+    if (!s) return '';
+    const el = document.createElement('span');
+    el.textContent = s;
+    return el.innerHTML;
+  }
+
+  function escAttr(s) {
+    if (!s) return '';
+    return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
   // ----------------------------------------------------------
-  //  Audio — synthesise beeps (no external files needed)
+  //  Audio — synthesised beeps (Web Audio API, no files)
   // ----------------------------------------------------------
   function ensureAudioCtx() {
     if (!audioCtx) {
@@ -145,39 +173,47 @@
     }
   }
 
-  function playTone(freq, duration, type) {
+  function playTone(freq, duration, type, delay) {
     if (muted) return;
     try {
       ensureAudioCtx();
+      const startTime = audioCtx.currentTime + (delay || 0);
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.type = type || 'sine';
       osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+      gain.gain.setValueAtTime(0.15, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
       osc.connect(gain);
       gain.connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + duration);
+      osc.start(startTime);
+      osc.stop(startTime + duration);
     } catch (_) { /* ignore audio errors */ }
   }
 
   function playUtropChime() {
-    playTone(880, 0.15, 'sine');
-    setTimeout(() => playTone(1100, 0.2, 'sine'), 160);
+    // Pleasant two-note ascending chime
+    playTone(880, 0.15, 'sine', 0);
+    playTone(1100, 0.22, 'sine', 0.16);
   }
 
   function playUnderSendingChime() {
-    playTone(520, 0.25, 'triangle');
-    setTimeout(() => playTone(520, 0.25, 'triangle'), 300);
-    setTimeout(() => playTone(660, 0.35, 'triangle'), 600);
+    // Urgent three-note alert
+    playTone(520, 0.2, 'triangle', 0);
+    playTone(520, 0.2, 'triangle', 0.28);
+    playTone(660, 0.3, 'triangle', 0.56);
+  }
+
+  function playNewBookingSound() {
+    // Soft notification blip
+    playTone(700, 0.08, 'sine', 0);
+    playTone(900, 0.12, 'sine', 0.1);
   }
 
   // ----------------------------------------------------------
   //  DOM Parsing
   // ----------------------------------------------------------
   function findBookingTable() {
-    // Find the main data table — look for a table with known header text
     const tables = document.querySelectorAll('table');
     for (const t of tables) {
       const firstRow = t.querySelector('tr');
@@ -206,6 +242,7 @@
 
   function parseTable() {
     const table = findBookingTable();
+    tableFound = !!table;
     if (!table) return [];
 
     const rows = table.querySelectorAll('tr');
@@ -256,6 +293,8 @@
       results.push(booking);
     }
 
+    lastParseTime = Date.now();
+    parseCount++;
     return results;
   }
 
@@ -263,14 +302,14 @@
   //  Sorting & Grouping
   // ----------------------------------------------------------
   function sortBookings(list) {
-    // Primary: sort by UTROP ascending
+    // Sort by UTROP ascending
     list.sort((a, b) => {
       const ta = a.utrop ? a.utrop.getTime() : Infinity;
       const tb = b.utrop ? b.utrop.getTime() : Infinity;
       return ta - tb;
     });
 
-    // Group ALTTURID siblings together
+    // Group ALTTURID siblings adjacent
     const grouped = [];
     const placed = new Set();
     const altGroups = {};
@@ -306,7 +345,6 @@
   function filterBookings(list) {
     let filtered = list;
 
-    // Status filter
     if (activeFilter === 'active') {
       filtered = filtered.filter(b => !COMPLETED_STATUSES.has(b.status));
     } else if (activeFilter === 'sending') {
@@ -317,7 +355,6 @@
       filtered = filtered.filter(b => COMPLETED_STATUSES.has(b.status));
     }
 
-    // Search
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter(b =>
@@ -356,16 +393,13 @@
   //  Build Overlay DOM
   // ----------------------------------------------------------
   function createOverlay() {
-    // Toggle button (always present)
+    // Toggle button (always visible)
     const toggle = document.createElement('button');
     toggle.id = 'vt-toggle-btn';
     toggle.textContent = 'VT';
-    toggle.title = 'Toggle Voss Taxi Wallboard';
+    toggle.title = 'Toggle Voss Taxi Wallboard (Escape)';
     toggle.addEventListener('click', () => {
-      overlayVisible = !overlayVisible;
-      const wb = document.getElementById('vt-wallboard');
-      if (wb) wb.classList.toggle('vt-hidden', !overlayVisible);
-      // Resume audio context on interaction
+      toggleOverlay();
       ensureAudioCtx();
     });
     document.body.appendChild(toggle);
@@ -383,18 +417,25 @@
       <div id="vt-header">
         <div id="vt-header-left">
           <div id="vt-logo">Voss <span>Taxi</span> Wallboard</div>
+          <div id="vt-status-indicator" class="vt-indicator--searching" title="Connection status">
+            <span class="vt-indicator-dot"></span>
+            <span class="vt-indicator-text">Searching...</span>
+          </div>
         </div>
-        <div id="vt-clock">00:00:00</div>
+        <div id="vt-header-right">
+          <div id="vt-date"></div>
+          <div id="vt-clock">00:00:00</div>
+        </div>
       </div>
       <div id="vt-stats"></div>
       <div id="vt-filter-bar">
-        <input type="text" id="vt-search" placeholder="Search name, taxi, address, phone..." autocomplete="off" />
+        <input type="text" id="vt-search" placeholder="Search name, taxi, address, phone... (Ctrl+F)" autocomplete="off" />
         <button class="vt-filter-btn active" data-filter="all">All</button>
         <button class="vt-filter-btn" data-filter="active">Active</button>
         <button class="vt-filter-btn" data-filter="sending">Under Sending</button>
         <button class="vt-filter-btn" data-filter="upcoming">Upcoming</button>
         <button class="vt-filter-btn" data-filter="completed">Completed</button>
-        <button id="vt-mute-btn" title="Mute/unmute audio alerts">&#x1f50a; Sound</button>
+        <button id="vt-mute-btn" title="Mute/unmute audio alerts (M)">&#x1f50a; Sound</button>
       </div>
       <div id="vt-table-wrap">
         <table id="vt-table">
@@ -424,12 +465,15 @@
     `;
     document.body.appendChild(wb);
 
-    // Event listeners
+    // --- Event listeners ---
+
+    // Search
     document.getElementById('vt-search').addEventListener('input', (e) => {
       searchQuery = e.target.value;
       renderTable();
     });
 
+    // Filter buttons
     document.querySelectorAll('.vt-filter-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         activeFilter = btn.dataset.filter;
@@ -439,19 +483,55 @@
       });
     });
 
-    document.getElementById('vt-mute-btn').addEventListener('click', () => {
-      muted = !muted;
-      const btn = document.getElementById('vt-mute-btn');
-      btn.classList.toggle('muted', muted);
-      btn.innerHTML = muted ? '&#x1f507; Muted' : '&#x1f50a; Sound';
-      chrome.storage.local.set({ vtMuted: muted });
-    });
+    // Mute toggle
+    document.getElementById('vt-mute-btn').addEventListener('click', toggleMute);
 
     // Scroll tracking
     const wrap = document.getElementById('vt-table-wrap');
     wrap.addEventListener('scroll', () => {
       lastScrollTime = Date.now();
       document.getElementById('vt-scroll-indicator').classList.add('visible');
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      // Don't capture when typing in input
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        // Escape blurs input
+        if (e.key === 'Escape') {
+          e.target.blur();
+          e.preventDefault();
+        }
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        toggleOverlay();
+        e.preventDefault();
+      } else if (e.key === 'm' || e.key === 'M') {
+        toggleMute();
+        e.preventDefault();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        // Focus search
+        if (overlayVisible) {
+          const search = document.getElementById('vt-search');
+          if (search) {
+            search.focus();
+            search.select();
+            e.preventDefault();
+          }
+        }
+      } else if (e.key === '1') {
+        setFilter('all');
+      } else if (e.key === '2') {
+        setFilter('active');
+      } else if (e.key === '3') {
+        setFilter('sending');
+      } else if (e.key === '4') {
+        setFilter('upcoming');
+      } else if (e.key === '5') {
+        setFilter('completed');
+      }
     });
 
     // Restore mute preference
@@ -465,6 +545,28 @@
     });
   }
 
+  function toggleOverlay() {
+    overlayVisible = !overlayVisible;
+    const wb = document.getElementById('vt-wallboard');
+    if (wb) wb.classList.toggle('vt-hidden', !overlayVisible);
+  }
+
+  function toggleMute() {
+    muted = !muted;
+    const btn = document.getElementById('vt-mute-btn');
+    btn.classList.toggle('muted', muted);
+    btn.innerHTML = muted ? '&#x1f507; Muted' : '&#x1f50a; Sound';
+    chrome.storage.local.set({ vtMuted: muted });
+  }
+
+  function setFilter(name) {
+    activeFilter = name;
+    document.querySelectorAll('.vt-filter-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.filter === name);
+    });
+    renderTable();
+  }
+
   // ----------------------------------------------------------
   //  Render
   // ----------------------------------------------------------
@@ -472,7 +574,9 @@
     const total = displayed.length;
     const sending = displayed.filter(b => b.status === 'UNDER SENDING').length;
     const upcoming = displayed.filter(b => isUpcoming(b.utrop)).length;
-    const active = displayed.filter(b => !COMPLETED_STATUSES.has(b.status) && b.status !== 'UNDER SENDING').length;
+    const active = displayed.filter(b =>
+      !COMPLETED_STATUSES.has(b.status) && b.status !== 'UNDER SENDING'
+    ).length;
     const completed = displayed.filter(b => COMPLETED_STATUSES.has(b.status)).length;
 
     document.getElementById('vt-stats').innerHTML = `
@@ -504,11 +608,28 @@
     `;
   }
 
+  function updateStatusIndicator() {
+    const el = document.getElementById('vt-status-indicator');
+    if (!el) return;
+
+    if (!tableFound) {
+      el.className = 'vt-indicator--searching';
+      el.querySelector('.vt-indicator-text').textContent = 'Searching for table...';
+    } else if (bookings.length === 0) {
+      el.className = 'vt-indicator--empty';
+      el.querySelector('.vt-indicator-text').textContent = 'Table found, no data';
+    } else {
+      el.className = 'vt-indicator--connected';
+      el.querySelector('.vt-indicator-text').textContent = 'Live \u2014 ' + bookings.length + ' bookings';
+    }
+  }
+
   function renderTable() {
     const sorted = sortBookings([...bookings]);
     const displayed = filterBookings(sorted);
 
     renderStats(displayed);
+    updateStatusIndicator();
 
     const tbody = document.getElementById('vt-tbody');
     const empty = document.getElementById('vt-empty');
@@ -538,6 +659,15 @@
       );
     }
 
+    // Detect new bookings for flash animation
+    const currentIds = new Set(displayed.map(b => b.id));
+    const newIds = new Set();
+    if (previousBookingIds.size > 0) {
+      for (const id of currentIds) {
+        if (!previousBookingIds.has(id)) newIds.add(id);
+      }
+    }
+
     let html = '';
     for (let i = 0; i < displayed.length; i++) {
       const b = displayed[i];
@@ -546,43 +676,46 @@
       const isFirst = isGrouped && ids.indexOf(b.id) === 0;
       const isLast = isGrouped && ids.indexOf(b.id) === ids.length - 1;
 
-      // Determine row class — if group is active, don't dim
+      // Row class — if group is active, don't dim
       let rClass = rowClass(b);
       if (isGrouped && groupActive[b.altturid] && rClass === 'vt-row--completed') {
         rClass = 'vt-row--active';
       }
 
-      let groupClasses = '';
-      if (isGrouped) groupClasses += ' vt-group-member';
-      if (isFirst) groupClasses += ' vt-group-start';
-      if (isLast) groupClasses += ' vt-group-end';
+      let classes = rClass;
+      if (isGrouped) classes += ' vt-group-member';
+      if (isFirst) classes += ' vt-group-start';
+      if (isLast) classes += ' vt-group-end';
+      if (newIds.has(b.id)) classes += ' vt-row-new';
+      classes += ' vt-row-enter';
 
       const statusSlug = statusBadgeClass(b.status);
-      const groupBadge = isGrouped ? `<span class="vt-group-badge">G</span>` : '';
+      const groupBadge = isGrouped
+        ? '<span class="vt-group-badge">G</span>'
+        : '';
 
-      html += `<tr class="${rClass}${groupClasses} vt-row-enter" data-id="${b.id}">
-        <td><span class="vt-utrop-time">${formatTime24(b.utrop)}</span></td>
-        <td><span class="vt-oppmote-time">${formatTime24(b.oppmote)}</span></td>
-        <td><span class="vt-taxi-num">${esc(b.taxi)}</span></td>
-        <td><span class="vt-status-badge vt-status--${statusSlug}">${esc(b.status)}</span></td>
-        <td>${esc(b.fra)}</td>
-        <td>${esc(b.til)}</td>
-        <td>${esc(b.navn)}</td>
-        <td>${esc(b.tlf)}</td>
-        <td>${esc(b.meldingTilBil)}</td>
-        <td>${esc(b.egenskap)}</td>
-        <td>${esc(b.altturid)}${groupBadge}</td>
-      </tr>`;
+      html += '<tr class="' + classes + '" data-id="' + escAttr(b.id) + '">' +
+        '<td><span class="vt-utrop-time">' + formatTime24(b.utrop) + '</span></td>' +
+        '<td><span class="vt-oppmote-time">' + formatTime24(b.oppmote) + '</span></td>' +
+        '<td><span class="vt-taxi-num">' + esc(b.taxi) + '</span></td>' +
+        '<td><span class="vt-status-badge vt-status--' + statusSlug + '">' + esc(b.status) + '</span></td>' +
+        '<td>' + esc(b.fra) + '</td>' +
+        '<td>' + esc(b.til) + '</td>' +
+        '<td>' + esc(b.navn) + '</td>' +
+        '<td>' + esc(b.tlf) + '</td>' +
+        '<td>' + esc(b.meldingTilBil) + '</td>' +
+        '<td>' + esc(b.egenskap) + '</td>' +
+        '<td>' + esc(b.altturid) + groupBadge + '</td>' +
+        '</tr>';
     }
 
     tbody.innerHTML = html;
-  }
+    previousBookingIds = currentIds;
 
-  function esc(s) {
-    if (!s) return '';
-    const el = document.createElement('span');
-    el.textContent = s;
-    return el.innerHTML;
+    // Play a notification for new bookings
+    if (newIds.size > 0 && parseCount > 1) {
+      playNewBookingSound();
+    }
   }
 
   // ----------------------------------------------------------
@@ -590,9 +723,13 @@
   // ----------------------------------------------------------
   function updateClock() {
     const n = now();
-    const el = document.getElementById('vt-clock');
-    if (el) {
-      el.textContent = pad(n.getHours()) + ':' + pad(n.getMinutes()) + ':' + pad(n.getSeconds());
+    const clockEl = document.getElementById('vt-clock');
+    if (clockEl) {
+      clockEl.textContent = pad(n.getHours()) + ':' + pad(n.getMinutes()) + ':' + pad(n.getSeconds());
+    }
+    const dateEl = document.getElementById('vt-date');
+    if (dateEl) {
+      dateEl.textContent = formatDate(n);
     }
   }
 
@@ -607,7 +744,6 @@
       if (bb === cb && !chimePlayed.has(b.id)) {
         chimePlayed.add(b.id);
         playUtropChime();
-        // Save chimed IDs so we don't re-chime on refresh
         break; // one chime per cycle to avoid noise flood
       }
     }
@@ -640,7 +776,7 @@
     const ind = document.getElementById('vt-scroll-indicator');
     if (ind) ind.classList.remove('visible');
 
-    // Find first active row
+    // Find first active/urgent row
     const row = document.querySelector(
       '#vt-tbody .vt-row--sending, #vt-tbody .vt-row--upcoming, #vt-tbody .vt-row--manual, #vt-tbody .vt-row--active'
     );
@@ -668,6 +804,11 @@
     updateClock();
   }
 
+  function debouncedUpdate() {
+    clearTimeout(mutationTimer);
+    mutationTimer = setTimeout(update, MUTATION_DEBOUNCE_MS);
+  }
+
   // ----------------------------------------------------------
   //  MutationObserver
   // ----------------------------------------------------------
@@ -675,10 +816,7 @@
     const table = findBookingTable();
     if (!table) return false;
 
-    const observer = new MutationObserver(() => {
-      update();
-    });
-
+    const observer = new MutationObserver(debouncedUpdate);
     observer.observe(table, {
       childList: true,
       subtree: true,
@@ -694,12 +832,15 @@
     createOverlay();
     update();
 
-    // Set up observer (with retry if table not found yet)
+    // Set up observer (with retry)
     let observerReady = setupObserver();
     if (!observerReady) {
       const retryObs = setInterval(() => {
         observerReady = setupObserver();
-        if (observerReady) clearInterval(retryObs);
+        if (observerReady) {
+          clearInterval(retryObs);
+          update(); // re-parse once observer connects
+        }
       }, 2000);
     }
 
@@ -713,7 +854,7 @@
     setInterval(checkAutoScroll, 5000);
   }
 
-  // Wait for DOM ready
+  // Wait for DOM
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {

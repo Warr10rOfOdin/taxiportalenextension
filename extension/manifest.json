@@ -3,7 +3,7 @@
   "name": "Voss Taxi Wallboard",
   "description": "Live operational wallboard overlay for Voss Taxi dispatchers — reads bookings directly from Taxiportalen.",
   "version": "1.0.0",
-  "permissions": ["storage"],
+  "permissions": ["storage", "tabs"],
   "host_permissions": [
     "https://taxiportalen.no/*",
     "https://*.taxiportalen.no/*"
