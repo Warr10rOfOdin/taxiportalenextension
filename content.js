@@ -61,19 +61,15 @@
     'ADD-ONS': 'add-ons',
   };
 
-  // Column definitions for the overlay table
+  // Column definitions for the overlay table (compact — details on click)
   const TABLE_COLUMNS = [
     { key: 'utrop',        label: 'UTROP',          sortKey: 'utrop'         },
     { key: 'oppmote',      label: 'OPPMOTE',        sortKey: 'oppmote'       },
     { key: 'taxi',         label: 'TAXI',           sortKey: 'taxi'          },
-    { key: 'status',       label: 'STATUS',         sortKey: 'status'        },
+    { key: 'navn',         label: 'NAVN',           sortKey: 'navn'          },
     { key: 'fra',          label: 'FRA',            sortKey: 'fra'           },
     { key: 'til',          label: 'TIL',            sortKey: 'til'           },
-    { key: 'navn',         label: 'NAVN',           sortKey: 'navn'          },
-    { key: 'tlf',          label: 'TLF',            sortKey: 'tlf'           },
-    { key: 'meldingTilBil',label: 'MELDING TIL BIL',sortKey: 'meldingTilBil' },
-    { key: 'egenskap',     label: 'EGENSKAP',       sortKey: 'egenskap'      },
-    { key: 'altturid',     label: 'ALTTURID',       sortKey: 'altturid'      },
+    { key: 'status',       label: 'STATUS',         sortKey: 'status'        },
   ];
 
   const WEEKDAYS_NO = ['Sondag', 'Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lordag'];
@@ -602,12 +598,20 @@
   // ----------------------------------------------------------
   //  Row classification
   // ----------------------------------------------------------
+  function isFutureTrip(booking) {
+    // Trip hasn't happened yet — utrop is in the future
+    if (booking.utrop && booking.utrop.getTime() > now().getTime()) return true;
+    if (booking.oppmote && booking.oppmote.getTime() > now().getTime()) return true;
+    return false;
+  }
+
   function rowClass(booking) {
     if (booking.status === 'UNDER SENDING') return 'vt-row--sending';
     if (isUpcoming(booking.utrop)) return 'vt-row--upcoming';
     if (booking.status === 'ENDRET') return 'vt-row--changed';
     if (booking.status === 'BEH.MANUELT') return 'vt-row--manual';
-    if (COMPLETED_STATUSES.has(booking.status)) return 'vt-row--completed';
+    // Future trips with completed status are still shown as active
+    if (COMPLETED_STATUSES.has(booking.status) && !isFutureTrip(booking)) return 'vt-row--completed';
     return 'vt-row--active';
   }
 
@@ -1113,15 +1117,11 @@
       html += '<tr class="' + classes + '" data-id="' + escAttr(b.id) + '" title="Click for details">' +
         '<td><span class="vt-utrop-time">' + formatTime24(b.utrop) + '</span>' + countdownHtml + '</td>' +
         '<td><span class="vt-oppmote-time">' + formatTime24(b.oppmote) + '</span></td>' +
-        '<td><span class="vt-taxi-num"' + taxiStyle + '>' + esc(b.taxi) + '</span></td>' +
-        '<td><span class="vt-status-badge vt-status--' + statusSlug + '">' + esc(b.status) + '</span></td>' +
+        '<td><span class="vt-taxi-num"' + taxiStyle + '>' + esc(b.taxi) + '</span>' + groupBadge + '</td>' +
+        '<td class="vt-cell-truncate" title="' + escAttr(b.navn) + '">' + esc(b.navn) + '</td>' +
         '<td class="vt-cell-truncate" title="' + escAttr(b.fra) + '">' + esc(b.fra) + '</td>' +
         '<td class="vt-cell-truncate" title="' + escAttr(b.til) + '">' + esc(b.til) + '</td>' +
-        '<td class="vt-cell-truncate" title="' + escAttr(b.navn) + '">' + esc(b.navn) + '</td>' +
-        '<td>' + esc(b.tlf) + '</td>' +
-        '<td class="vt-cell-truncate" title="' + escAttr(b.meldingTilBil) + '">' + esc(b.meldingTilBil) + '</td>' +
-        '<td>' + esc(b.egenskap) + '</td>' +
-        '<td>' + esc(b.altturid) + groupBadge + '</td>' +
+        '<td><span class="vt-status-badge vt-status--' + statusSlug + '">' + esc(b.status) + '</span></td>' +
         '</tr>';
 
       // Expanded detail row

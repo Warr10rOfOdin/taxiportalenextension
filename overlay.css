@@ -205,18 +205,14 @@
   table-layout: fixed;
 }
 
-/* Column widths — tuned for dispatch wallboard readability */
-#vt-table colgroup col:nth-child(1) { width: 80px; }   /* UTROP */
-#vt-table colgroup col:nth-child(2) { width: 80px; }   /* OPPMOTE */
-#vt-table colgroup col:nth-child(3) { width: 60px; }   /* TAXI */
-#vt-table colgroup col:nth-child(4) { width: 130px; }  /* STATUS */
-#vt-table colgroup col:nth-child(5) { width: auto; }   /* FRA */
-#vt-table colgroup col:nth-child(6) { width: auto; }   /* TIL */
-#vt-table colgroup col:nth-child(7) { width: 120px; }  /* NAVN */
-#vt-table colgroup col:nth-child(8) { width: 90px; }   /* TLF */
-#vt-table colgroup col:nth-child(9) { width: auto; }   /* MELDING TIL BIL */
-#vt-table colgroup col:nth-child(10) { width: 80px; }  /* EGENSKAP */
-#vt-table colgroup col:nth-child(11) { width: 80px; }  /* ALTTURID */
+/* Column widths — 7 compact columns, all fit on one screen */
+#vt-table colgroup col:nth-child(1) { width: 85px; }   /* UTROP */
+#vt-table colgroup col:nth-child(2) { width: 75px; }   /* OPPMOTE */
+#vt-table colgroup col:nth-child(3) { width: 80px; }   /* TAXI */
+#vt-table colgroup col:nth-child(4) { width: 120px; }  /* NAVN */
+#vt-table colgroup col:nth-child(5) { width: auto; }   /* FRA — flexible */
+#vt-table colgroup col:nth-child(6) { width: auto; }   /* TIL — flexible */
+#vt-table colgroup col:nth-child(7) { width: 155px; }  /* STATUS */
 
 #vt-table thead th {
   position: sticky;
@@ -264,17 +260,18 @@
 
 /* Active row — default */
 .vt-row--active td {
-  color: #d4d8e0;
+  color: #e2e6ed;
 }
 
-/* Completed / dimmed row */
+/* Completed / dimmed row — still readable, just subdued */
 .vt-row--completed td {
-  color: #4b5563 !important;
-  opacity: 0.6;
+  color: #6b7a94 !important;
+  opacity: 0.75;
 }
 
 .vt-row--completed:hover td {
-  opacity: 0.8;
+  opacity: 0.9;
+  color: #93a3bf !important;
 }
 
 /* UNDER SENDING — red pulse */
@@ -873,8 +870,9 @@
 }
 
 @media (max-width: 600px) {
-  #vt-table thead th:nth-child(n+8),
-  #vt-table tbody td:nth-child(n+8) {
+  /* Hide NAVN column on very small screens */
+  #vt-table thead th:nth-child(4),
+  #vt-table tbody td:nth-child(4) {
     display: none;
   }
   .vt-cell-truncate {
