@@ -1,5 +1,5 @@
 // ============================================================
-//  Voss Taxi Wallboard — Content Script  v1.3
+//  Voss Taxi Wallboard — Content Script  v1.4
 //  Reads booking data from Taxiportalen DOM and renders a
 //  dark-mode dispatch wallboard overlay.
 // ============================================================
@@ -96,6 +96,8 @@
   let sortColumn = 'utrop';    // default sort
   let sortDirection = 'asc';   // asc | desc
   let isFullscreen = false;
+  let debugVisible = false;
+  let lastDiagnostics = null;
 
   // Consistent taxi number → color mapping
   const taxiColorCache = {};
@@ -273,17 +275,77 @@
   // ----------------------------------------------------------
   //  DOM Parsing
   // ----------------------------------------------------------
-  function findBookingTable() {
-    const tables = document.querySelectorAll('table');
+
+  // Check if we are inside an iframe (sub-frame)
+  const isSubFrame = window !== window.top;
+
+  // Collect all accessible documents (main + same-origin iframes)
+  function getAllDocuments() {
+    const docs = [document];
+    if (isSubFrame) return docs; // sub-frames only search their own document
+    try {
+      const iframes = document.querySelectorAll('iframe, frame');
+      for (const iframe of iframes) {
+        try {
+          const doc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
+          if (doc) docs.push(doc);
+        } catch (_) { /* cross-origin, skip */ }
+      }
+    } catch (_) {}
+    return docs;
+  }
+
+  function findBookingTableInDoc(doc) {
+    const tables = doc.querySelectorAll('table');
     for (const t of tables) {
-      const firstRow = t.querySelector('tr');
-      if (!firstRow) continue;
-      const text = firstRow.textContent.toUpperCase();
+      // Check <thead> first, then first <tr>
+      const thead = t.querySelector('thead');
+      const headerRow = thead ? thead.querySelector('tr') : t.querySelector('tr');
+      if (!headerRow) continue;
+      const text = headerRow.textContent.toUpperCase();
       if (text.includes('TAXI') && text.includes('STATUS') && (text.includes('UTROP') || text.includes('FRA'))) {
-        return t;
+        return { table: t, doc: doc };
       }
     }
     return null;
+  }
+
+  function findBookingTable() {
+    const docs = getAllDocuments();
+    for (const doc of docs) {
+      const result = findBookingTableInDoc(doc);
+      if (result) return result;
+    }
+    return null;
+  }
+
+  function findHeaderRow(table) {
+    // Strategy 1: header in <thead>
+    const thead = table.querySelector('thead');
+    if (thead) {
+      const row = thead.querySelector('tr');
+      if (row) {
+        const text = row.textContent.toUpperCase();
+        if (text.includes('TAXI') || text.includes('STATUS')) return row;
+      }
+    }
+    // Strategy 2: first <tr> with <th> cells
+    const rows = table.querySelectorAll('tr');
+    for (const row of rows) {
+      if (row.querySelector('th')) {
+        const text = row.textContent.toUpperCase();
+        if (text.includes('TAXI') || text.includes('STATUS')) return row;
+      }
+    }
+    // Strategy 3: first <tr> that contains known header text
+    for (const row of rows) {
+      const text = row.textContent.toUpperCase();
+      if (text.includes('TAXI') && (text.includes('STATUS') || text.includes('UTROP') || text.includes('FRA'))) {
+        return row;
+      }
+    }
+    // Fallback: first row
+    return rows[0] || null;
   }
 
   function mapHeaders(headerRow) {
@@ -300,20 +362,44 @@
     return map;
   }
 
+  function getDataRows(table, headerRow) {
+    const allRows = Array.from(table.querySelectorAll('tr'));
+    // Find the header row index and return everything after it
+    const headerIndex = allRows.indexOf(headerRow);
+    if (headerIndex >= 0) {
+      return allRows.slice(headerIndex + 1);
+    }
+    // If header is in <thead>, get rows from <tbody> or all non-header rows
+    const tbody = table.querySelector('tbody');
+    if (tbody) {
+      return Array.from(tbody.querySelectorAll('tr'));
+    }
+    return allRows.slice(1);
+  }
+
   function parseTable() {
-    const table = findBookingTable();
-    tableFound = !!table;
-    if (!table) return [];
+    const found = findBookingTable();
+    tableFound = !!(found && found.table);
+    if (!found) return [];
 
-    const rows = table.querySelectorAll('tr');
-    if (rows.length < 2) return [];
+    const { table } = found;
+    const headerRow = findHeaderRow(table);
+    if (!headerRow) return [];
 
-    const headerMap = mapHeaders(rows[0]);
+    const dataRows = getDataRows(table, headerRow);
+    if (dataRows.length === 0) return [];
+
+    const headerMap = mapHeaders(headerRow);
     const results = [];
 
-    for (let r = 1; r < rows.length; r++) {
-      const cells = rows[r].querySelectorAll('td');
-      if (cells.length < 4) continue;
+    // Track diagnostics
+    let skippedEmpty = 0;
+
+    for (let r = 0; r < dataRows.length; r++) {
+      const row = dataRows[r];
+      const cells = row.querySelectorAll('td');
+      // Accept rows with at least 2 cells (some tables have sparse rows)
+      if (cells.length < 2) { skippedEmpty++; continue; }
 
       const get = (key) => {
         if (headerMap[key] !== undefined && cells[headerMap[key]]) {
@@ -324,11 +410,18 @@
 
       const utropRaw = get('utrop');
       const oppmoteRaw = get('oppmote');
+      const statusRaw = get('status');
+
+      // Skip completely empty rows (no meaningful data)
+      if (!utropRaw && !oppmoteRaw && !statusRaw && !get('taxi') && !get('fra') && !get('navn')) {
+        skippedEmpty++;
+        continue;
+      }
 
       const booking = {
         fakturnr: get('fakturnr'),
         taxi: get('taxi'),
-        status: get('status').toUpperCase(),
+        status: statusRaw.toUpperCase(),
         utropRaw,
         utrop: parseTimeString(utropRaw),
         oppmoteRaw,
@@ -351,6 +444,15 @@
 
       results.push(booking);
     }
+
+    // Store diagnostics for debug panel
+    lastDiagnostics = {
+      headerCols: Object.keys(headerMap).length,
+      totalRows: dataRows.length,
+      parsedRows: results.length,
+      skippedEmpty,
+      mappedColumns: headerMap,
+    };
 
     lastParseTime = Date.now();
     parseCount++;
@@ -518,9 +620,12 @@
         '<button class="vt-filter-btn" data-filter="completed">Completed</button>' +
         '<button id="vt-mute-btn" title="Mute/unmute audio alerts (M)">&#x1f50a; Sound</button>' +
         '<button id="vt-fullscreen-btn" title="Fullscreen mode (F)">&#x26F6; Fullscreen</button>' +
+        '<button id="vt-debug-btn" title="Toggle debug diagnostics (D)">&#x1f41b; Debug</button>' +
       '</div>' +
+      '<div id="vt-debug-panel" style="display:none;"></div>' +
       '<div id="vt-table-wrap">' +
         '<table id="vt-table">' +
+          '<colgroup>' + TABLE_COLUMNS.map(() => '<col>').join('') + '</colgroup>' +
           '<thead><tr>' + theadHtml + '</tr></thead>' +
           '<tbody id="vt-tbody"></tbody>' +
         '</table>' +
@@ -572,6 +677,9 @@
     // Fullscreen toggle
     document.getElementById('vt-fullscreen-btn').addEventListener('click', toggleFullscreen);
 
+    // Debug toggle
+    document.getElementById('vt-debug-btn').addEventListener('click', toggleDebug);
+
     // Scroll tracking
     const wrap = document.getElementById('vt-table-wrap');
     wrap.addEventListener('scroll', () => {
@@ -613,6 +721,9 @@
         e.preventDefault();
       } else if (e.key === 'm' || e.key === 'M') {
         toggleMute();
+        e.preventDefault();
+      } else if (e.key === 'd' || e.key === 'D') {
+        toggleDebug();
         e.preventDefault();
       } else if (e.key === 'f' && !e.ctrlKey && !e.metaKey) {
         toggleFullscreen();
@@ -684,6 +795,75 @@
       b.classList.toggle('active', b.dataset.filter === name);
     });
     renderTable();
+  }
+
+  function toggleDebug() {
+    debugVisible = !debugVisible;
+    const panel = document.getElementById('vt-debug-panel');
+    if (panel) {
+      panel.style.display = debugVisible ? 'block' : 'none';
+      if (debugVisible) renderDebugPanel();
+    }
+    const btn = document.getElementById('vt-debug-btn');
+    if (btn) btn.classList.toggle('active', debugVisible);
+  }
+
+  function renderDebugPanel() {
+    const panel = document.getElementById('vt-debug-panel');
+    if (!panel || !debugVisible) return;
+
+    const docs = getAllDocuments();
+    const found = findBookingTable();
+
+    let tablesInfo = '';
+    let docIdx = 0;
+    for (const doc of docs) {
+      const tables = doc.querySelectorAll('table');
+      const isIframe = doc !== document;
+      tablesInfo += '<div style="margin-bottom:4px;"><strong>' +
+        (isIframe ? 'iframe' : 'main') + ' doc:</strong> ' +
+        tables.length + ' table(s)</div>';
+      for (const t of tables) {
+        const firstRow = t.querySelector('tr');
+        const cellCount = firstRow ? firstRow.querySelectorAll('th, td').length : 0;
+        const rowCount = t.querySelectorAll('tr').length;
+        const headerText = firstRow ? firstRow.textContent.trim().substring(0, 100) : '(empty)';
+        const hasThead = !!t.querySelector('thead');
+        const hasTbody = !!t.querySelector('tbody');
+        tablesInfo += '<div style="font-size:11px;color:#6b7a94;margin-left:12px;margin-bottom:2px;">' +
+          rowCount + ' rows, ' + cellCount + ' cols' +
+          (hasThead ? ', &lt;thead&gt;' : '') +
+          (hasTbody ? ', &lt;tbody&gt;' : '') +
+          ' — header: "' + esc(headerText) + '"</div>';
+      }
+      docIdx++;
+    }
+
+    let diagHtml = '';
+    if (lastDiagnostics) {
+      const d = lastDiagnostics;
+      diagHtml = '<div style="margin-top:8px;"><strong>Last parse:</strong> ' +
+        d.headerCols + ' mapped cols, ' +
+        d.totalRows + ' data rows, ' +
+        d.parsedRows + ' parsed, ' +
+        d.skippedEmpty + ' skipped</div>' +
+        '<div style="font-size:11px;color:#6b7a94;margin-top:2px;">' +
+        'Mapped: ' + esc(Object.keys(d.mappedColumns).join(', ')) + '</div>';
+    }
+
+    const iframes = document.querySelectorAll('iframe, frame');
+
+    panel.innerHTML =
+      '<div style="font-weight:600;margin-bottom:6px;">Diagnostics</div>' +
+      '<div>Table found: <strong>' + (found ? 'YES' : 'NO') + '</strong></div>' +
+      '<div>Bookings parsed: <strong>' + bookings.length + '</strong></div>' +
+      '<div>Parse count: ' + parseCount + '</div>' +
+      '<div>Documents scanned: ' + docs.length + '</div>' +
+      '<div>Iframes on page: ' + iframes.length + '</div>' +
+      '<div>Is sub-frame: ' + isSubFrame + '</div>' +
+      '<div style="margin-top:6px;"><strong>Tables:</strong></div>' +
+      tablesInfo +
+      diagHtml;
   }
 
   function updateSortHeaders() {
@@ -775,6 +955,7 @@
 
     renderStats(displayed);
     updateStatusIndicator();
+    if (debugVisible) renderDebugPanel();
 
     const tbody = document.getElementById('vt-tbody');
     const empty = document.getElementById('vt-empty');
@@ -992,11 +1173,11 @@
   //  MutationObserver
   // ----------------------------------------------------------
   function setupObserver() {
-    const table = findBookingTable();
-    if (!table) return false;
+    const found = findBookingTable();
+    if (!found) return false;
 
     const observer = new MutationObserver(debouncedUpdate);
-    observer.observe(table, {
+    observer.observe(found.table, {
       childList: true,
       subtree: true,
       characterData: true,
@@ -1008,6 +1189,12 @@
   //  Initialisation
   // ----------------------------------------------------------
   function init() {
+    // Sub-frames: only notify parent about table data, don't create overlay
+    if (isSubFrame) {
+      initSubFrame();
+      return;
+    }
+
     createOverlay();
     update();
 
@@ -1026,6 +1213,28 @@
     setInterval(updateClock, 1000);
     setInterval(checkAutoScroll, 5000);
     setInterval(updateBadge, BADGE_UPDATE_MS);
+  }
+
+  // Sub-frame: parse table and send data to parent via messaging
+  function initSubFrame() {
+    function sendToParent() {
+      const data = parseTable();
+      try {
+        chrome.runtime.sendMessage({
+          type: 'vtSubFrameData',
+          bookings: data.map(b => ({
+            ...b,
+            utrop: b.utrop ? b.utrop.toISOString() : null,
+            oppmote: b.oppmote ? b.oppmote.toISOString() : null,
+          })),
+          tableFound: tableFound,
+        });
+      } catch (_) {}
+    }
+
+    sendToParent();
+    setupObserver();
+    setInterval(sendToParent, POLL_INTERVAL_MS);
   }
 
   // ----------------------------------------------------------
