@@ -664,6 +664,71 @@
   text-overflow: ellipsis;
 }
 
+/* ---------- Countdown badge ---------- */
+.vt-countdown {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.5px;
+  animation: vt-badge-pulse 1.5s infinite;
+}
+
+/* ---------- Fullscreen button ---------- */
+#vt-fullscreen-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #1e2536;
+  background: #161b28;
+  color: #93a3bf;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+#vt-fullscreen-btn:hover {
+  background: #1e2536;
+  color: #d4d8e0;
+}
+
+/* ---------- Fullscreen mode ---------- */
+#vt-wallboard:fullscreen {
+  background: #0b0e14;
+}
+
+#vt-wallboard:fullscreen #vt-table tbody td {
+  padding: 14px 16px;
+  font-size: 16px;
+}
+
+#vt-wallboard:fullscreen .vt-utrop-time {
+  font-size: 20px;
+}
+
+#vt-wallboard:fullscreen .vt-taxi-num {
+  font-size: 18px;
+}
+
+#vt-wallboard:fullscreen #vt-clock {
+  font-size: 36px;
+}
+
+#vt-wallboard:fullscreen .vt-status-badge {
+  font-size: 14px;
+  padding: 4px 12px;
+}
+
+#vt-wallboard:fullscreen #vt-table thead th {
+  padding: 12px 16px;
+  font-size: 13px;
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 1200px) {
   #vt-table tbody td,
@@ -673,5 +738,88 @@
   }
   .vt-utrop-time {
     font-size: 14px;
+  }
+}
+
+@media (max-width: 900px) {
+  #vt-header {
+    padding: 8px 12px;
+  }
+  #vt-header-left {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  #vt-logo {
+    font-size: 16px;
+  }
+  #vt-clock {
+    font-size: 20px;
+  }
+  #vt-stats {
+    padding: 6px 12px;
+    gap: 6px;
+  }
+  .vt-stat {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+  .vt-stat-value {
+    font-size: 14px;
+  }
+  #vt-filter-bar {
+    padding: 6px 12px;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  #vt-search {
+    max-width: 100%;
+    flex-basis: 100%;
+    order: -1;
+  }
+  .vt-filter-btn {
+    padding: 4px 10px;
+    font-size: 11px;
+  }
+  #vt-table-wrap {
+    padding: 0 8px 8px;
+  }
+  #vt-table tbody td {
+    padding: 6px 6px;
+    font-size: 12px;
+  }
+  #vt-table thead th {
+    padding: 6px 6px;
+    font-size: 10px;
+  }
+  .vt-utrop-time {
+    font-size: 13px;
+  }
+  .vt-taxi-num {
+    font-size: 13px;
+  }
+  .vt-cell-truncate {
+    max-width: 100px;
+  }
+  .vt-detail-grid {
+    grid-template-columns: 100px 1fr;
+  }
+  .vt-countdown {
+    display: none;
+  }
+  #vt-status-indicator {
+    display: none;
+  }
+  #vt-last-update {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  #vt-table thead th:nth-child(n+8),
+  #vt-table tbody td:nth-child(n+8) {
+    display: none;
+  }
+  .vt-cell-truncate {
+    max-width: 70px;
   }
 }

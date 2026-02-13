@@ -1,5 +1,5 @@
 // ============================================================
-//  Voss Taxi Wallboard — Content Script  v1.2
+//  Voss Taxi Wallboard — Content Script  v1.3
 //  Reads booking data from Taxiportalen DOM and renders a
 //  dark-mode dispatch wallboard overlay.
 // ============================================================
@@ -95,6 +95,15 @@
   let expandedRowId = null;
   let sortColumn = 'utrop';    // default sort
   let sortDirection = 'asc';   // asc | desc
+  let isFullscreen = false;
+
+  // Consistent taxi number → color mapping
+  const taxiColorCache = {};
+  const TAXI_COLORS = [
+    '#60a5fa', '#f87171', '#34d399', '#fbbf24', '#a78bfa',
+    '#fb923c', '#38bdf8', '#f472b6', '#4ade80', '#e879f9',
+    '#22d3ee', '#facc15', '#818cf8', '#fb7185', '#2dd4bf',
+  ];
 
   // Audio context (created on first user interaction)
   let audioCtx = null;
@@ -191,6 +200,28 @@
   function escAttr(s) {
     if (!s) return '';
     return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function formatCountdown(utropDate) {
+    if (!utropDate) return '';
+    const diff = utropDate.getTime() - now().getTime();
+    if (diff <= 0 || diff > UPCOMING_MINUTES * 60000) return '';
+    const mins = Math.floor(diff / 60000);
+    const secs = Math.floor((diff % 60000) / 1000);
+    return mins + ':' + pad(secs);
+  }
+
+  function taxiColor(taxiNum) {
+    if (!taxiNum) return '';
+    if (taxiColorCache[taxiNum]) return taxiColorCache[taxiNum];
+    let hash = 0;
+    for (let i = 0; i < taxiNum.length; i++) {
+      hash = ((hash << 5) - hash) + taxiNum.charCodeAt(i);
+      hash |= 0;
+    }
+    const color = TAXI_COLORS[Math.abs(hash) % TAXI_COLORS.length];
+    taxiColorCache[taxiNum] = color;
+    return color;
   }
 
   // ----------------------------------------------------------
@@ -486,6 +517,7 @@
         '<button class="vt-filter-btn" data-filter="upcoming">Upcoming</button>' +
         '<button class="vt-filter-btn" data-filter="completed">Completed</button>' +
         '<button id="vt-mute-btn" title="Mute/unmute audio alerts (M)">&#x1f50a; Sound</button>' +
+        '<button id="vt-fullscreen-btn" title="Fullscreen mode (F)">&#x26F6; Fullscreen</button>' +
       '</div>' +
       '<div id="vt-table-wrap">' +
         '<table id="vt-table">' +
@@ -537,6 +569,9 @@
     // Mute toggle
     document.getElementById('vt-mute-btn').addEventListener('click', toggleMute);
 
+    // Fullscreen toggle
+    document.getElementById('vt-fullscreen-btn').addEventListener('click', toggleFullscreen);
+
     // Scroll tracking
     const wrap = document.getElementById('vt-table-wrap');
     wrap.addEventListener('scroll', () => {
@@ -578,6 +613,9 @@
         e.preventDefault();
       } else if (e.key === 'm' || e.key === 'M') {
         toggleMute();
+        e.preventDefault();
+      } else if (e.key === 'f' && !e.ctrlKey && !e.metaKey) {
+        toggleFullscreen();
         e.preventDefault();
       } else if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         if (overlayVisible) {
@@ -624,6 +662,20 @@
     btn.classList.toggle('muted', muted);
     btn.innerHTML = muted ? '&#x1f507; Muted' : '&#x1f50a; Sound';
     chrome.storage.local.set({ vtMuted: muted });
+  }
+
+  function toggleFullscreen() {
+    const wb = document.getElementById('vt-wallboard');
+    if (!wb) return;
+    if (!document.fullscreenElement) {
+      wb.requestFullscreen().catch(() => {});
+      isFullscreen = true;
+    } else {
+      document.exitFullscreen().catch(() => {});
+      isFullscreen = false;
+    }
+    const btn = document.getElementById('vt-fullscreen-btn');
+    if (btn) btn.innerHTML = isFullscreen ? '&#x26F6; Exit' : '&#x26F6; Fullscreen';
   }
 
   function setFilter(name) {
@@ -786,10 +838,20 @@
       const statusSlug = statusBadgeClass(b.status);
       const groupBadge = isGrouped ? '<span class="vt-group-badge">G</span>' : '';
 
+      // Countdown for upcoming bookings
+      const countdown = isUpcoming(b.utrop) ? formatCountdown(b.utrop) : '';
+      const countdownHtml = countdown
+        ? '<span class="vt-countdown">' + countdown + '</span>'
+        : '';
+
+      // Color-coded taxi number
+      const tColor = taxiColor(b.taxi);
+      const taxiStyle = tColor ? ' style="color:' + tColor + '"' : '';
+
       html += '<tr class="' + classes + '" data-id="' + escAttr(b.id) + '" title="Click for details">' +
-        '<td><span class="vt-utrop-time">' + formatTime24(b.utrop) + '</span></td>' +
+        '<td><span class="vt-utrop-time">' + formatTime24(b.utrop) + '</span>' + countdownHtml + '</td>' +
         '<td><span class="vt-oppmote-time">' + formatTime24(b.oppmote) + '</span></td>' +
-        '<td><span class="vt-taxi-num">' + esc(b.taxi) + '</span></td>' +
+        '<td><span class="vt-taxi-num"' + taxiStyle + '>' + esc(b.taxi) + '</span></td>' +
         '<td><span class="vt-status-badge vt-status--' + statusSlug + '">' + esc(b.status) + '</span></td>' +
         '<td class="vt-cell-truncate" title="' + escAttr(b.fra) + '">' + esc(b.fra) + '</td>' +
         '<td class="vt-cell-truncate" title="' + escAttr(b.til) + '">' + esc(b.til) + '</td>' +
