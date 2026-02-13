@@ -22,6 +22,7 @@
   // Recognised column names → normalised keys
   const COLUMN_MAP = {
     'FAKTURNR': 'fakturnr',
+    'REKVIRENT': 'rekvirent',
     'TAXI': 'taxi',
     'STATUS': 'status',
     'UTROP': 'utrop',
@@ -32,11 +33,14 @@
     'TIL': 'til',
     'NAVN': 'navn',
     'MELDING TIL BIL': 'meldingTilBil',
+    'MELDINGTILBIL': 'meldingTilBil',
     'BET': 'bet',
+    'REF': 'ref',
     'ALTTURID': 'altturid',
     'TLF': 'tlf',
     'EGENSKAP': 'egenskap',
     'TURID': 'turid',
+    'INTERNNR': 'internnr',
   };
 
   const COMPLETED_STATUSES = new Set([
@@ -298,6 +302,8 @@
   function findBookingTableInDoc(doc) {
     const tables = doc.querySelectorAll('table');
     for (const t of tables) {
+      // Skip our own overlay table
+      if (t.id === 'vt-table') continue;
       // Check <thead> first, then first <tr>
       const thead = t.querySelector('thead');
       const headerRow = thead ? thead.querySelector('tr') : t.querySelector('tr');
@@ -350,15 +356,30 @@
 
   function mapHeaders(headerRow) {
     const map = {};
+    const rawHeaders = [];
     const cells = headerRow.querySelectorAll('th, td');
     for (let i = 0; i < cells.length; i++) {
       const raw = (cells[i].textContent || '').trim().toUpperCase();
+      rawHeaders.push(raw);
+      // Prefer exact match first
       for (const [key, val] of Object.entries(COLUMN_MAP)) {
-        if (raw === key || raw.includes(key)) {
+        if (raw === key) {
           map[val] = i;
         }
       }
     }
+    // Then try includes match (only if not already mapped exactly)
+    for (let i = 0; i < rawHeaders.length; i++) {
+      const raw = rawHeaders[i];
+      for (const [key, val] of Object.entries(COLUMN_MAP)) {
+        if (map[val] !== undefined) continue; // already mapped by exact match
+        if (raw.includes(key)) {
+          map[val] = i;
+        }
+      }
+    }
+    // Store raw headers for diagnostics
+    map._rawHeaders = rawHeaders;
     return map;
   }
 
@@ -394,12 +415,15 @@
 
     // Track diagnostics
     let skippedEmpty = 0;
+    let skippedFewCells = 0;
+    let filteredByWindow = 0;
+    const sampleRows = []; // first 3 rows for debug
 
     for (let r = 0; r < dataRows.length; r++) {
       const row = dataRows[r];
       const cells = row.querySelectorAll('td');
       // Accept rows with at least 2 cells (some tables have sparse rows)
-      if (cells.length < 2) { skippedEmpty++; continue; }
+      if (cells.length < 2) { skippedFewCells++; continue; }
 
       const get = (key) => {
         if (headerMap[key] !== undefined && cells[headerMap[key]]) {
@@ -411,6 +435,21 @@
       const utropRaw = get('utrop');
       const oppmoteRaw = get('oppmote');
       const statusRaw = get('status');
+
+      // Collect sample data for debugging (first 3 rows)
+      if (sampleRows.length < 3) {
+        sampleRows.push({
+          cellCount: cells.length,
+          utrop: utropRaw,
+          oppmote: oppmoteRaw,
+          status: statusRaw,
+          taxi: get('taxi'),
+          fra: get('fra'),
+          navn: get('navn'),
+          oppmoteParsed: parseTimeString(oppmoteRaw),
+          utropParsed: parseTimeString(utropRaw),
+        });
+      }
 
       // Skip completely empty rows (no meaningful data)
       if (!utropRaw && !oppmoteRaw && !statusRaw && !get('taxi') && !get('fra') && !get('navn')) {
@@ -440,18 +479,26 @@
 
       booking.id = bookingId(booking);
 
-      if (booking.oppmote && !isWithinWindow(booking.oppmote)) continue;
+      if (booking.oppmote && !isWithinWindow(booking.oppmote)) {
+        filteredByWindow++;
+        continue;
+      }
 
       results.push(booking);
     }
 
     // Store diagnostics for debug panel
     lastDiagnostics = {
-      headerCols: Object.keys(headerMap).length,
+      headerCols: Object.keys(headerMap).filter(k => k !== '_rawHeaders').length,
       totalRows: dataRows.length,
       parsedRows: results.length,
       skippedEmpty,
+      skippedFewCells,
+      filteredByWindow,
       mappedColumns: headerMap,
+      rawHeaders: headerMap._rawHeaders || [],
+      sampleRows,
+      currentTime: now().toISOString(),
     };
 
     lastParseTime = Date.now();
@@ -846,9 +893,37 @@
         d.headerCols + ' mapped cols, ' +
         d.totalRows + ' data rows, ' +
         d.parsedRows + ' parsed, ' +
-        d.skippedEmpty + ' skipped</div>' +
-        '<div style="font-size:11px;color:#6b7a94;margin-top:2px;">' +
-        'Mapped: ' + esc(Object.keys(d.mappedColumns).join(', ')) + '</div>';
+        d.skippedFewCells + ' few-cells, ' +
+        d.skippedEmpty + ' empty, ' +
+        '<span style="color:' + (d.filteredByWindow > 0 ? '#f87171' : '#86efac') + ';">' +
+        d.filteredByWindow + ' filtered-by-window</span></div>';
+
+      diagHtml += '<div style="font-size:11px;color:#6b7a94;margin-top:2px;">' +
+        'Current time: ' + esc(d.currentTime) + '</div>';
+
+      diagHtml += '<div style="font-size:11px;color:#6b7a94;margin-top:2px;">' +
+        'Raw headers: [' + esc(d.rawHeaders.join(' | ')) + ']</div>';
+
+      diagHtml += '<div style="font-size:11px;color:#6b7a94;margin-top:2px;">' +
+        'Mapped: ' + esc(Object.keys(d.mappedColumns).filter(k => k !== '_rawHeaders').join(', ')) + '</div>';
+
+      if (d.sampleRows && d.sampleRows.length > 0) {
+        diagHtml += '<div style="margin-top:6px;"><strong>Sample rows (first 3):</strong></div>';
+        for (let i = 0; i < d.sampleRows.length; i++) {
+          const s = d.sampleRows[i];
+          const parsedOpp = s.oppmoteParsed ? s.oppmoteParsed.toISOString() : 'null';
+          const parsedUtr = s.utropParsed ? s.utropParsed.toISOString() : 'null';
+          const inWindow = s.oppmoteParsed ? isWithinWindow(s.oppmoteParsed) : 'N/A (null)';
+          diagHtml += '<div style="font-size:11px;color:#6b7a94;margin-left:12px;margin-bottom:2px;">' +
+            'Row ' + (i + 1) + ': ' + s.cellCount + ' cells | ' +
+            'taxi=' + esc(s.taxi) + ' | ' +
+            'status=' + esc(s.status) + ' | ' +
+            'utrop="' + esc(s.utrop) + '"→' + esc(parsedUtr) + ' | ' +
+            'oppmote="' + esc(s.oppmote) + '"→' + esc(parsedOpp) +
+            ' | inWindow=' + inWindow +
+            '</div>';
+        }
+      }
     }
 
     const iframes = document.querySelectorAll('iframe, frame');
