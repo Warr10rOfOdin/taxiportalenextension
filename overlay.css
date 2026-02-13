@@ -202,8 +202,21 @@
   width: 100%;
   border-collapse: separate;
   border-spacing: 0 4px;
-  table-layout: auto;
+  table-layout: fixed;
 }
+
+/* Column widths — tuned for dispatch wallboard readability */
+#vt-table colgroup col:nth-child(1) { width: 80px; }   /* UTROP */
+#vt-table colgroup col:nth-child(2) { width: 80px; }   /* OPPMOTE */
+#vt-table colgroup col:nth-child(3) { width: 60px; }   /* TAXI */
+#vt-table colgroup col:nth-child(4) { width: 130px; }  /* STATUS */
+#vt-table colgroup col:nth-child(5) { width: auto; }   /* FRA */
+#vt-table colgroup col:nth-child(6) { width: auto; }   /* TIL */
+#vt-table colgroup col:nth-child(7) { width: 120px; }  /* NAVN */
+#vt-table colgroup col:nth-child(8) { width: 90px; }   /* TLF */
+#vt-table colgroup col:nth-child(9) { width: auto; }   /* MELDING TIL BIL */
+#vt-table colgroup col:nth-child(10) { width: 80px; }  /* EGENSKAP */
+#vt-table colgroup col:nth-child(11) { width: 80px; }  /* ALTTURID */
 
 #vt-table thead th {
   position: sticky;
@@ -659,7 +672,11 @@
 
 /* ---------- Cell truncation ---------- */
 .vt-cell-truncate {
-  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#vt-table tbody td {
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -677,6 +694,47 @@
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.5px;
   animation: vt-badge-pulse 1.5s infinite;
+}
+
+/* ---------- Debug button ---------- */
+#vt-debug-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #1e2536;
+  background: #161b28;
+  color: #93a3bf;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+#vt-debug-btn:hover {
+  background: #1e2536;
+  color: #d4d8e0;
+}
+
+#vt-debug-btn.active {
+  background: rgba(251, 191, 36, 0.15);
+  border-color: #fbbf24;
+  color: #fbbf24;
+}
+
+/* ---------- Debug panel ---------- */
+#vt-debug-panel {
+  padding: 12px 24px;
+  background: #0a0c10;
+  border-bottom: 1px solid #1a1f2e;
+  font-size: 12px;
+  color: #9ca3af;
+  line-height: 1.6;
+  max-height: 250px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+#vt-debug-panel strong {
+  color: #d4d8e0;
 }
 
 /* ---------- Fullscreen button ---------- */
