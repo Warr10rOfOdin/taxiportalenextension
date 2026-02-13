@@ -223,14 +223,16 @@
 
   function taxiColor(taxiNum) {
     if (!taxiNum) return '';
-    if (taxiColorCache[taxiNum]) return taxiColorCache[taxiNum];
+    // Color by løyve prefix (R, VE, I, etc.) so all taxis in same løyve share color
+    const prefix = taxiNum.replace(/[\d\s]/g, '').toUpperCase() || taxiNum;
+    if (taxiColorCache[prefix]) return taxiColorCache[prefix];
     let hash = 0;
-    for (let i = 0; i < taxiNum.length; i++) {
-      hash = ((hash << 5) - hash) + taxiNum.charCodeAt(i);
+    for (let i = 0; i < prefix.length; i++) {
+      hash = ((hash << 5) - hash) + prefix.charCodeAt(i);
       hash |= 0;
     }
     const color = TAXI_COLORS[Math.abs(hash) % TAXI_COLORS.length];
-    taxiColorCache[taxiNum] = color;
+    taxiColorCache[prefix] = color;
     return color;
   }
 
@@ -1056,48 +1058,33 @@
   }
 
   function buildCard(b, classes, statusSlug, groupBadge, countdownHtml, taxiStyle) {
-    // Optional detail fields
-    let details = '';
-    const extras = [];
-    if (b.tlf) extras.push(esc(b.tlf));
-    if (b.egenskap) extras.push(esc(b.egenskap));
-    if (b.behandlingstid) extras.push(esc(b.behandlingstid));
-    if (b.bet) extras.push(esc(b.bet));
+    // Build route: "fra → til"
+    const route = (b.fra || '\u2014') + ' \u2192 ' + (b.til || '\u2014');
 
-    const extrasHtml = extras.length > 0
-      ? '<div class="vt-card-extras">' + extras.join(' &middot; ') + '</div>'
-      : '';
-
-    const meldingHtml = b.meldingTilBil
-      ? '<div class="vt-card-melding" title="' + escAttr(b.meldingTilBil) + '">' + esc(b.meldingTilBil) + '</div>'
-      : '';
-
-    const altHtml = b.altturid
-      ? '<span class="vt-card-alt">Alt:' + esc(b.altturid) + '</span>'
+    // Sub-line: melding + extras (only shown if content exists)
+    const parts = [];
+    if (b.meldingTilBil) parts.push('<span class="vt-sub-melding">' + esc(b.meldingTilBil) + '</span>');
+    if (b.tlf) parts.push(esc(b.tlf));
+    if (b.egenskap) parts.push(esc(b.egenskap));
+    if (b.behandlingstid) parts.push(esc(b.behandlingstid));
+    if (b.bet) parts.push(esc(b.bet));
+    if (b.altturid) parts.push('Alt:' + esc(b.altturid));
+    const subHtml = parts.length > 0
+      ? '<div class="vt-card-sub">' + parts.join(' \u00b7 ') + '</div>'
       : '';
 
     return '<div class="vt-card ' + classes + '" data-id="' + escAttr(b.id) + '">' +
-      '<div class="vt-card-top">' +
-        '<div class="vt-card-times">' +
-          '<span class="vt-utrop-time">' + formatTime24(b.utrop) + '</span>' +
-          '<span class="vt-time-arrow">\u2192</span>' +
-          '<span class="vt-oppmote-time">' + formatTime24(b.oppmote) + '</span>' +
-          countdownHtml +
-        '</div>' +
-        '<span class="vt-taxi-num"' + taxiStyle + '>' + esc(b.taxi) + '</span>' +
+      '<div class="vt-card-row">' +
+        '<span class="vt-card-time">' + formatTime24(b.utrop) +
+          '<span class="vt-arr">\u2192</span>' + formatTime24(b.oppmote) +
+          countdownHtml + '</span>' +
+        '<span class="vt-card-taxi"' + taxiStyle + '>' + esc(b.taxi) + '</span>' +
         groupBadge +
+        '<span class="vt-card-route" title="' + escAttr(route) + '">' + esc(route) + '</span>' +
+        '<span class="vt-card-navn">' + esc(b.navn) + '</span>' +
         '<span class="vt-status-badge vt-status--' + statusSlug + '">' + esc(b.status) + '</span>' +
       '</div>' +
-      '<div class="vt-card-addr">' +
-        '<div class="vt-card-fra"><span class="vt-addr-label">FRA</span> ' + esc(b.fra) + '</div>' +
-        '<div class="vt-card-til"><span class="vt-addr-label">TIL</span> ' + esc(b.til) + '</div>' +
-      '</div>' +
-      '<div class="vt-card-bottom">' +
-        '<span class="vt-card-navn">' + esc(b.navn) + '</span>' +
-        extrasHtml +
-        altHtml +
-      '</div>' +
-      meldingHtml +
+      subHtml +
     '</div>';
   }
 
@@ -1163,7 +1150,6 @@
       if (isFirst) classes += ' vt-group-start';
       if (isLast) classes += ' vt-group-end';
       if (newIds.has(b.id)) classes += ' vt-card-new';
-      classes += ' vt-card-enter';
 
       const statusSlug = statusBadgeClass(b.status);
       const groupBadge = isGrouped ? '<span class="vt-group-badge">G</span>' : '';
@@ -1179,7 +1165,11 @@
       html += buildCard(b, classes, statusSlug, groupBadge, countdownHtml, taxiStyle);
     }
 
+    // Preserve scroll position during re-render
+    const wrap = document.getElementById('vt-cards-wrap');
+    const scrollTop = wrap ? wrap.scrollTop : 0;
     container.innerHTML = html;
+    if (wrap) wrap.scrollTop = scrollTop;
     previousBookingIds = currentIds;
 
     if (newIds.size > 0 && parseCount > 1) {
