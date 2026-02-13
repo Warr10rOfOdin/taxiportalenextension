@@ -148,8 +148,14 @@
   function parseTimeString(str) {
     if (!str || typeof str !== 'string') return null;
     str = str.trim();
-    // Try: "DD.MM.YYYY HH:MM(:SS)"
-    let match = str.match(/(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+    // Try: "YYYY-MM-DD HH:MM(:SS)" (ISO format, used by Taxiportalen)
+    let match = str.match(/(\d{4})[./-](\d{1,2})[./-](\d{1,2})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+    if (match) {
+      return new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10),
+        parseInt(match[4], 10), parseInt(match[5], 10), parseInt(match[6] || 0, 10));
+    }
+    // Try: "DD.MM.YYYY HH:MM(:SS)" (European format)
+    match = str.match(/(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
     if (match) {
       let year = parseInt(match[3], 10);
       if (year < 100) year += 2000;
