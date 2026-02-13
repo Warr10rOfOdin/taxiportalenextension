@@ -1,0 +1,825 @@
+/* ============================================================
+   Voss Taxi Wallboard — Dark-mode overlay
+   ============================================================ */
+
+/* ---------- Reset & base ---------- */
+#vt-wallboard *,
+#vt-wallboard *::before,
+#vt-wallboard *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+#vt-wallboard {
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: #0b0e14;
+  color: #d4d8e0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: opacity 0.3s ease;
+}
+
+#vt-wallboard.vt-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ---------- Header ---------- */
+#vt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #111520 0%, #161b28 100%);
+  border-bottom: 1px solid #1e2536;
+  flex-shrink: 0;
+}
+
+#vt-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+#vt-logo {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: #f0f2f5;
+}
+
+#vt-logo span {
+  color: #fbbf24;
+}
+
+#vt-clock {
+  font-size: 28px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #93a3bf;
+  letter-spacing: 1px;
+}
+
+/* ---------- Stats bar ---------- */
+#vt-stats {
+  display: flex;
+  gap: 12px;
+  padding: 10px 24px;
+  background: #0f1219;
+  border-bottom: 1px solid #1a1f2e;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.vt-stat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  background: #161b28;
+  border: 1px solid #1e2536;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.vt-stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 24px;
+  text-align: center;
+}
+
+.vt-stat--total .vt-stat-value { color: #60a5fa; }
+.vt-stat--sending .vt-stat-value { color: #f87171; }
+.vt-stat--upcoming .vt-stat-value { color: #fbbf24; }
+.vt-stat--active .vt-stat-value { color: #34d399; }
+.vt-stat--completed .vt-stat-value { color: #6b7280; }
+
+.vt-stat-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.vt-stat--total .vt-stat-dot { background: #60a5fa; }
+.vt-stat--sending .vt-stat-dot { background: #f87171; animation: vt-pulse-dot 1.5s infinite; }
+.vt-stat--upcoming .vt-stat-dot { background: #fbbf24; }
+.vt-stat--active .vt-stat-dot { background: #34d399; }
+.vt-stat--completed .vt-stat-dot { background: #6b7280; }
+
+/* ---------- Search / filter bar ---------- */
+#vt-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 24px;
+  background: #0f1219;
+  border-bottom: 1px solid #1a1f2e;
+  flex-shrink: 0;
+}
+
+#vt-search {
+  flex: 1;
+  max-width: 360px;
+  padding: 7px 12px 7px 36px;
+  border-radius: 8px;
+  border: 1px solid #1e2536;
+  background: #161b28 url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%236b7280" viewBox="0 0 16 16"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.156a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>') no-repeat 10px center;
+  color: #d4d8e0;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+#vt-search:focus {
+  border-color: #3b82f6;
+}
+
+#vt-search::placeholder {
+  color: #4b5563;
+}
+
+.vt-filter-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid #1e2536;
+  background: #161b28;
+  color: #93a3bf;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.vt-filter-btn:hover {
+  background: #1e2536;
+  color: #d4d8e0;
+}
+
+.vt-filter-btn.active {
+  background: #1d4ed8;
+  border-color: #3b82f6;
+  color: #fff;
+}
+
+/* ---------- Table wrapper ---------- */
+#vt-table-wrap {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+  padding: 0 16px 16px;
+  scroll-behavior: smooth;
+}
+
+#vt-table-wrap::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+#vt-table-wrap::-webkit-scrollbar-track {
+  background: #0b0e14;
+}
+
+#vt-table-wrap::-webkit-scrollbar-thumb {
+  background: #2a3042;
+  border-radius: 4px;
+}
+
+#vt-table-wrap::-webkit-scrollbar-thumb:hover {
+  background: #3b4560;
+}
+
+/* ---------- Booking table ---------- */
+#vt-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 4px;
+  table-layout: auto;
+}
+
+#vt-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 10px 12px;
+  background: #111520;
+  color: #6b7a94;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 2px solid #1e2536;
+}
+
+#vt-table tbody tr {
+  transition: background 0.2s, opacity 0.3s;
+  cursor: default;
+}
+
+#vt-table tbody td {
+  padding: 10px 12px;
+  font-size: 14px;
+  white-space: nowrap;
+  background: #12161f;
+  border-top: 1px solid transparent;
+  border-bottom: 1px solid transparent;
+}
+
+#vt-table tbody td:first-child {
+  border-radius: 8px 0 0 8px;
+}
+
+#vt-table tbody td:last-child {
+  border-radius: 0 8px 8px 0;
+}
+
+#vt-table tbody tr:hover td {
+  background: #181d2a;
+}
+
+/* ---------- Row states ---------- */
+
+/* Active row — default */
+.vt-row--active td {
+  color: #d4d8e0;
+}
+
+/* Completed / dimmed row */
+.vt-row--completed td {
+  color: #4b5563 !important;
+  opacity: 0.6;
+}
+
+.vt-row--completed:hover td {
+  opacity: 0.8;
+}
+
+/* UNDER SENDING — red pulse */
+.vt-row--sending td {
+  background: rgba(239, 68, 68, 0.08) !important;
+  color: #fca5a5;
+}
+
+.vt-row--sending td:first-child {
+  box-shadow: inset 4px 0 0 0 #ef4444;
+}
+
+.vt-row--sending {
+  animation: vt-pulse-row 2s ease-in-out infinite;
+}
+
+/* Upcoming — yellow glow */
+.vt-row--upcoming td {
+  background: rgba(251, 191, 36, 0.06) !important;
+  color: #fde68a;
+}
+
+.vt-row--upcoming td:first-child {
+  box-shadow: inset 4px 0 0 0 #fbbf24;
+}
+
+.vt-row--upcoming {
+  animation: vt-glow-yellow 2.5s ease-in-out infinite;
+}
+
+/* BEH.MANUELT — manual attention */
+.vt-row--manual td {
+  color: #c4b5fd;
+}
+
+.vt-row--manual td:first-child {
+  box-shadow: inset 4px 0 0 0 #8b5cf6;
+}
+
+/* ENDRET — changed */
+.vt-row--changed td {
+  color: #fdba74;
+}
+
+.vt-row--changed td:first-child {
+  box-shadow: inset 4px 0 0 0 #f97316;
+}
+
+/* ---------- ALTTURID grouping ---------- */
+.vt-group-start td {
+  border-top: 2px solid #2563eb !important;
+}
+
+.vt-group-member td:first-child {
+  box-shadow: inset 4px 0 0 0 #2563eb;
+}
+
+.vt-group-end td {
+  border-bottom: 2px solid #2563eb !important;
+}
+
+.vt-group-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(37, 99, 235, 0.15);
+  color: #60a5fa;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 6px;
+}
+
+/* ---------- Status badges ---------- */
+.vt-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.vt-status--under-sending {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  animation: vt-badge-pulse 1.5s infinite;
+}
+
+.vt-status--ja-svar {
+  background: rgba(34, 197, 94, 0.12);
+  color: #86efac;
+}
+
+.vt-status--klar-fakturering {
+  background: rgba(107, 114, 128, 0.15);
+  color: #9ca3af;
+}
+
+.vt-status--kontant {
+  background: rgba(107, 114, 128, 0.15);
+  color: #9ca3af;
+}
+
+.vt-status--kreditt {
+  background: rgba(107, 114, 128, 0.15);
+  color: #9ca3af;
+}
+
+.vt-status--endret {
+  background: rgba(249, 115, 22, 0.15);
+  color: #fdba74;
+}
+
+.vt-status--beh-manuelt {
+  background: rgba(139, 92, 246, 0.15);
+  color: #c4b5fd;
+}
+
+.vt-status--add-ons {
+  background: rgba(37, 99, 235, 0.12);
+  color: #93c5fd;
+}
+
+.vt-status--default {
+  background: rgba(107, 114, 128, 0.1);
+  color: #9ca3af;
+}
+
+/* ---------- UTROP time emphasis ---------- */
+.vt-utrop-time {
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.5px;
+}
+
+.vt-oppmote-time {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Taxi number ---------- */
+.vt-taxi-num {
+  font-weight: 700;
+  font-size: 15px;
+  color: #e0e4ea;
+}
+
+/* ---------- Animations ---------- */
+@keyframes vt-pulse-row {
+  0%, 100% { background: transparent; }
+  50% { background: rgba(239, 68, 68, 0.04); }
+}
+
+@keyframes vt-glow-yellow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+  50% { box-shadow: 0 0 12px 2px rgba(251, 191, 36, 0.1); }
+}
+
+@keyframes vt-badge-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes vt-pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+@keyframes vt-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.vt-row-enter {
+  animation: vt-fade-in 0.3s ease-out;
+}
+
+/* ---------- Toggle button (always visible) ---------- */
+#vt-toggle-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000000;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 2px solid #fbbf24;
+  background: #1a1f2e;
+  color: #fbbf24;
+  font-size: 22px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  transition: all 0.2s;
+}
+
+#vt-toggle-btn:hover {
+  background: #fbbf24;
+  color: #0b0e14;
+  transform: scale(1.08);
+}
+
+/* ---------- Mute indicator ---------- */
+#vt-mute-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #1e2536;
+  background: #161b28;
+  color: #93a3bf;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+#vt-mute-btn:hover {
+  background: #1e2536;
+}
+
+#vt-mute-btn.muted {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
+  color: #fca5a5;
+}
+
+/* ---------- Empty state ---------- */
+#vt-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  color: #4b5563;
+  font-size: 16px;
+  text-align: center;
+  gap: 12px;
+}
+
+#vt-empty-icon {
+  font-size: 48px;
+  opacity: 0.3;
+}
+
+/* ---------- Scroll indicator ---------- */
+#vt-scroll-indicator {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  z-index: 1000000;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: rgba(26, 31, 46, 0.9);
+  border: 1px solid #1e2536;
+  color: #6b7a94;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+
+#vt-scroll-indicator.visible {
+  opacity: 1;
+}
+
+/* ---------- Header right (clock + date) ---------- */
+#vt-header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+#vt-date {
+  font-size: 12px;
+  color: #4b5563;
+  letter-spacing: 0.3px;
+}
+
+/* ---------- Status indicator ---------- */
+#vt-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.vt-indicator-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.vt-indicator--connected {
+  background: rgba(34, 197, 94, 0.1);
+  color: #86efac;
+}
+.vt-indicator--connected .vt-indicator-dot {
+  background: #22c55e;
+  animation: vt-pulse-dot 2s infinite;
+}
+
+.vt-indicator--searching {
+  background: rgba(251, 191, 36, 0.1);
+  color: #fbbf24;
+}
+.vt-indicator--searching .vt-indicator-dot {
+  background: #fbbf24;
+  animation: vt-pulse-dot 1s infinite;
+}
+
+.vt-indicator--empty {
+  background: rgba(107, 114, 128, 0.1);
+  color: #9ca3af;
+}
+.vt-indicator--empty .vt-indicator-dot {
+  background: #6b7280;
+}
+
+/* ---------- New booking flash ---------- */
+@keyframes vt-flash-new {
+  0% { background: rgba(34, 197, 94, 0.25); }
+  100% { background: transparent; }
+}
+
+.vt-row-new td {
+  animation: vt-flash-new 1.5s ease-out !important;
+}
+
+/* ---------- Last update timestamp ---------- */
+#vt-last-update {
+  font-size: 11px;
+  color: #374151;
+  letter-spacing: 0.2px;
+}
+
+/* ---------- Sortable headers ---------- */
+.vt-th-sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s;
+}
+
+.vt-th-sortable:hover {
+  color: #93a3bf;
+}
+
+.vt-th-active {
+  color: #60a5fa !important;
+}
+
+/* ---------- Row expansion ---------- */
+#vt-table tbody tr[data-id] {
+  cursor: pointer;
+}
+
+.vt-row-expanded td {
+  border-bottom-color: #2563eb !important;
+}
+
+.vt-detail-row td {
+  background: #0f1219 !important;
+  padding: 16px 20px !important;
+  border-radius: 0 0 8px 8px !important;
+  white-space: normal !important;
+}
+
+.vt-detail-grid {
+  display: grid;
+  grid-template-columns: 140px 1fr 140px 1fr;
+  gap: 8px 16px;
+  font-size: 13px;
+}
+
+.vt-detail-label {
+  color: #6b7a94;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  align-self: center;
+}
+
+.vt-detail-value {
+  color: #d4d8e0;
+  word-break: break-word;
+}
+
+/* ---------- Cell truncation ---------- */
+.vt-cell-truncate {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Countdown badge ---------- */
+.vt-countdown {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.5px;
+  animation: vt-badge-pulse 1.5s infinite;
+}
+
+/* ---------- Fullscreen button ---------- */
+#vt-fullscreen-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #1e2536;
+  background: #161b28;
+  color: #93a3bf;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+#vt-fullscreen-btn:hover {
+  background: #1e2536;
+  color: #d4d8e0;
+}
+
+/* ---------- Fullscreen mode ---------- */
+#vt-wallboard:fullscreen {
+  background: #0b0e14;
+}
+
+#vt-wallboard:fullscreen #vt-table tbody td {
+  padding: 14px 16px;
+  font-size: 16px;
+}
+
+#vt-wallboard:fullscreen .vt-utrop-time {
+  font-size: 20px;
+}
+
+#vt-wallboard:fullscreen .vt-taxi-num {
+  font-size: 18px;
+}
+
+#vt-wallboard:fullscreen #vt-clock {
+  font-size: 36px;
+}
+
+#vt-wallboard:fullscreen .vt-status-badge {
+  font-size: 14px;
+  padding: 4px 12px;
+}
+
+#vt-wallboard:fullscreen #vt-table thead th {
+  padding: 12px 16px;
+  font-size: 13px;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1200px) {
+  #vt-table tbody td,
+  #vt-table thead th {
+    padding: 8px 8px;
+    font-size: 13px;
+  }
+  .vt-utrop-time {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 900px) {
+  #vt-header {
+    padding: 8px 12px;
+  }
+  #vt-header-left {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  #vt-logo {
+    font-size: 16px;
+  }
+  #vt-clock {
+    font-size: 20px;
+  }
+  #vt-stats {
+    padding: 6px 12px;
+    gap: 6px;
+  }
+  .vt-stat {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+  .vt-stat-value {
+    font-size: 14px;
+  }
+  #vt-filter-bar {
+    padding: 6px 12px;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  #vt-search {
+    max-width: 100%;
+    flex-basis: 100%;
+    order: -1;
+  }
+  .vt-filter-btn {
+    padding: 4px 10px;
+    font-size: 11px;
+  }
+  #vt-table-wrap {
+    padding: 0 8px 8px;
+  }
+  #vt-table tbody td {
+    padding: 6px 6px;
+    font-size: 12px;
+  }
+  #vt-table thead th {
+    padding: 6px 6px;
+    font-size: 10px;
+  }
+  .vt-utrop-time {
+    font-size: 13px;
+  }
+  .vt-taxi-num {
+    font-size: 13px;
+  }
+  .vt-cell-truncate {
+    max-width: 100px;
+  }
+  .vt-detail-grid {
+    grid-template-columns: 100px 1fr;
+  }
+  .vt-countdown {
+    display: none;
+  }
+  #vt-status-indicator {
+    display: none;
+  }
+  #vt-last-update {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  #vt-table thead th:nth-child(n+8),
+  #vt-table tbody td:nth-child(n+8) {
+    display: none;
+  }
+  .vt-cell-truncate {
+    max-width: 70px;
+  }
+}
