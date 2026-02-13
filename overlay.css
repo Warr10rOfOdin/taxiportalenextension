@@ -1,5 +1,5 @@
 /* ============================================================
-   Voss Taxi Wallboard — Dark-mode overlay
+   Voss Taxi Wallboard — Dark-mode card overlay
    ============================================================ */
 
 /* ---------- Reset & base ---------- */
@@ -34,7 +34,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 24px;
+  padding: 10px 24px;
   background: linear-gradient(135deg, #111520 0%, #161b28 100%);
   border-bottom: 1px solid #1e2536;
   flex-shrink: 0;
@@ -47,7 +47,7 @@
 }
 
 #vt-logo {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.5px;
   color: #f0f2f5;
@@ -58,7 +58,7 @@
 }
 
 #vt-clock {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: #93a3bf;
@@ -68,8 +68,8 @@
 /* ---------- Stats bar ---------- */
 #vt-stats {
   display: flex;
-  gap: 12px;
-  padding: 10px 24px;
+  gap: 10px;
+  padding: 8px 24px;
   background: #0f1219;
   border-bottom: 1px solid #1a1f2e;
   flex-shrink: 0;
@@ -79,20 +79,20 @@
 .vt-stat {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
+  gap: 6px;
+  padding: 4px 12px;
   border-radius: 8px;
   background: #161b28;
   border: 1px solid #1e2536;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
 }
 
 .vt-stat-value {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  min-width: 24px;
+  min-width: 20px;
   text-align: center;
 }
 
@@ -103,8 +103,8 @@
 .vt-stat--completed .vt-stat-value { color: #6b7280; }
 
 .vt-stat-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -115,54 +115,47 @@
 .vt-stat--active .vt-stat-dot { background: #34d399; }
 .vt-stat--completed .vt-stat-dot { background: #6b7280; }
 
-/* ---------- Search / filter bar ---------- */
+/* ---------- Filter bar ---------- */
 #vt-filter-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   padding: 8px 24px;
   background: #0f1219;
   border-bottom: 1px solid #1a1f2e;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 #vt-search {
   flex: 1;
-  max-width: 360px;
-  padding: 7px 12px 7px 36px;
+  max-width: 260px;
+  padding: 6px 10px 6px 32px;
   border-radius: 8px;
   border: 1px solid #1e2536;
-  background: #161b28 url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%236b7280" viewBox="0 0 16 16"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.156a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>') no-repeat 10px center;
+  background: #161b28 url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="%236b7280" viewBox="0 0 16 16"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.156a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>') no-repeat 10px center;
   color: #d4d8e0;
-  font-size: 14px;
+  font-size: 13px;
   outline: none;
   transition: border-color 0.2s;
 }
 
-#vt-search:focus {
-  border-color: #3b82f6;
-}
-
-#vt-search::placeholder {
-  color: #4b5563;
-}
+#vt-search:focus { border-color: #3b82f6; }
+#vt-search::placeholder { color: #4b5563; }
 
 .vt-filter-btn {
-  padding: 6px 14px;
+  padding: 5px 12px;
   border-radius: 8px;
   border: 1px solid #1e2536;
   background: #161b28;
   color: #93a3bf;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
   transition: all 0.15s;
   white-space: nowrap;
 }
 
-.vt-filter-btn:hover {
-  background: #1e2536;
-  color: #d4d8e0;
-}
+.vt-filter-btn:hover { background: #1e2536; color: #d4d8e0; }
 
 .vt-filter-btn.active {
   background: #1d4ed8;
@@ -170,194 +163,289 @@
   color: #fff;
 }
 
-/* ---------- Table wrapper ---------- */
-#vt-table-wrap {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: auto;
-  padding: 0 16px 16px;
-  scroll-behavior: smooth;
+/* Sort controls */
+.vt-sort-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
 }
 
-#vt-table-wrap::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-#vt-table-wrap::-webkit-scrollbar-track {
-  background: #0b0e14;
-}
-
-#vt-table-wrap::-webkit-scrollbar-thumb {
-  background: #2a3042;
-  border-radius: 4px;
-}
-
-#vt-table-wrap::-webkit-scrollbar-thumb:hover {
-  background: #3b4560;
-}
-
-/* ---------- Booking table ---------- */
-#vt-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0 4px;
-  table-layout: fixed;
-}
-
-/* Column widths — tuned for dispatch wallboard readability */
-#vt-table colgroup col:nth-child(1) { width: 80px; }   /* UTROP */
-#vt-table colgroup col:nth-child(2) { width: 80px; }   /* OPPMOTE */
-#vt-table colgroup col:nth-child(3) { width: 60px; }   /* TAXI */
-#vt-table colgroup col:nth-child(4) { width: 130px; }  /* STATUS */
-#vt-table colgroup col:nth-child(5) { width: auto; }   /* FRA */
-#vt-table colgroup col:nth-child(6) { width: auto; }   /* TIL */
-#vt-table colgroup col:nth-child(7) { width: 120px; }  /* NAVN */
-#vt-table colgroup col:nth-child(8) { width: 90px; }   /* TLF */
-#vt-table colgroup col:nth-child(9) { width: auto; }   /* MELDING TIL BIL */
-#vt-table colgroup col:nth-child(10) { width: 80px; }  /* EGENSKAP */
-#vt-table colgroup col:nth-child(11) { width: 80px; }  /* ALTTURID */
-
-#vt-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  padding: 10px 12px;
-  background: #111520;
-  color: #6b7a94;
+.vt-sort-label {
   font-size: 11px;
-  font-weight: 600;
+  color: #6b7a94;
   text-transform: uppercase;
-  letter-spacing: 0.8px;
-  text-align: left;
-  white-space: nowrap;
-  border-bottom: 2px solid #1e2536;
+  letter-spacing: 0.5px;
 }
 
-#vt-table tbody tr {
-  transition: background 0.2s, opacity 0.3s;
-  cursor: default;
+#vt-sort-select {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #1e2536;
+  background: #161b28;
+  color: #93a3bf;
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
 }
 
-#vt-table tbody td {
-  padding: 10px 12px;
+#vt-sort-dir {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #1e2536;
+  background: #161b28;
+  color: #93a3bf;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#vt-sort-dir:hover,
+#vt-sort-select:hover { background: #1e2536; color: #d4d8e0; }
+
+/* Toolbar icon buttons (mute, fullscreen, debug) */
+#vt-mute-btn,
+#vt-fullscreen-btn,
+#vt-debug-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #1e2536;
+  background: #161b28;
+  color: #93a3bf;
   font-size: 14px;
-  white-space: nowrap;
-  background: #12161f;
-  border-top: 1px solid transparent;
-  border-bottom: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
 }
 
-#vt-table tbody td:first-child {
-  border-radius: 8px 0 0 8px;
-}
-
-#vt-table tbody td:last-child {
-  border-radius: 0 8px 8px 0;
-}
-
-#vt-table tbody tr:hover td {
-  background: #181d2a;
-}
-
-/* ---------- Row states ---------- */
-
-/* Active row — default */
-.vt-row--active td {
+#vt-mute-btn:hover,
+#vt-fullscreen-btn:hover,
+#vt-debug-btn:hover {
+  background: #1e2536;
   color: #d4d8e0;
 }
 
-/* Completed / dimmed row */
-.vt-row--completed td {
-  color: #4b5563 !important;
-  opacity: 0.6;
-}
-
-.vt-row--completed:hover td {
-  opacity: 0.8;
-}
-
-/* UNDER SENDING — red pulse */
-.vt-row--sending td {
-  background: rgba(239, 68, 68, 0.08) !important;
+#vt-mute-btn.muted {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
   color: #fca5a5;
 }
 
-.vt-row--sending td:first-child {
-  box-shadow: inset 4px 0 0 0 #ef4444;
+#vt-debug-btn.active {
+  background: rgba(251, 191, 36, 0.15);
+  border-color: #fbbf24;
+  color: #fbbf24;
 }
 
-.vt-row--sending {
-  animation: vt-pulse-row 2s ease-in-out infinite;
+/* ---------- Cards container ---------- */
+#vt-cards-wrap {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 24px 16px;
+  scroll-behavior: smooth;
 }
 
-/* Upcoming — yellow glow */
-.vt-row--upcoming td {
-  background: rgba(251, 191, 36, 0.06) !important;
+#vt-cards-wrap::-webkit-scrollbar { width: 8px; }
+#vt-cards-wrap::-webkit-scrollbar-track { background: #0b0e14; }
+#vt-cards-wrap::-webkit-scrollbar-thumb { background: #2a3042; border-radius: 4px; }
+#vt-cards-wrap::-webkit-scrollbar-thumb:hover { background: #3b4560; }
+
+#vt-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ---------- Booking card ---------- */
+.vt-card {
+  background: #12161f;
+  border-radius: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+  border-left: 4px solid transparent;
+}
+
+.vt-card:hover {
+  background: #181d2a;
+}
+
+/* Card layout rows */
+.vt-card-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.vt-card-times {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.vt-time-arrow {
+  color: #4b5563;
+  font-size: 12px;
+  margin: 0 2px;
+}
+
+.vt-card-addr {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 4px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.vt-card-fra,
+.vt-card-til {
+  flex: 1;
+  min-width: 0;
+}
+
+.vt-addr-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #4b5563;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: 6px;
+}
+
+.vt-card-bottom {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: #6b7a94;
+}
+
+.vt-card-navn {
+  font-weight: 600;
+  color: #93a3bf;
+}
+
+.vt-card-extras {
+  color: #4b5563;
+}
+
+.vt-card-alt {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(37, 99, 235, 0.1);
+  color: #60a5fa;
+  margin-left: auto;
+}
+
+.vt-card-melding {
+  margin-top: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(251, 191, 36, 0.06);
+  color: #fbbf24;
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* ---------- Card states ---------- */
+
+/* Active — default */
+.vt-card.vt-row--active {
+  color: #e2e6ed;
+  border-left-color: #34d399;
+}
+
+/* Completed — subdued */
+.vt-card.vt-row--completed {
+  color: #6b7a94;
+  opacity: 0.7;
+  border-left-color: #374151;
+}
+
+.vt-card.vt-row--completed:hover {
+  opacity: 0.85;
+}
+
+.vt-card.vt-row--completed .vt-card-addr,
+.vt-card.vt-row--completed .vt-card-bottom {
+  color: #4b5563;
+}
+
+/* UNDER SENDING — red pulse */
+.vt-card.vt-row--sending {
+  background: rgba(239, 68, 68, 0.06);
+  color: #fca5a5;
+  border-left-color: #ef4444;
+  animation: vt-pulse-card 2s ease-in-out infinite;
+}
+
+/* Upcoming — yellow */
+.vt-card.vt-row--upcoming {
+  background: rgba(251, 191, 36, 0.04);
   color: #fde68a;
+  border-left-color: #fbbf24;
 }
 
-.vt-row--upcoming td:first-child {
-  box-shadow: inset 4px 0 0 0 #fbbf24;
-}
-
-.vt-row--upcoming {
-  animation: vt-glow-yellow 2.5s ease-in-out infinite;
-}
-
-/* BEH.MANUELT — manual attention */
-.vt-row--manual td {
-  color: #c4b5fd;
-}
-
-.vt-row--manual td:first-child {
-  box-shadow: inset 4px 0 0 0 #8b5cf6;
-}
-
-/* ENDRET — changed */
-.vt-row--changed td {
+/* ENDRET — orange */
+.vt-card.vt-row--changed {
   color: #fdba74;
+  border-left-color: #f97316;
 }
 
-.vt-row--changed td:first-child {
-  box-shadow: inset 4px 0 0 0 #f97316;
+/* BEH.MANUELT — purple */
+.vt-card.vt-row--manual {
+  color: #c4b5fd;
+  border-left-color: #8b5cf6;
 }
 
 /* ---------- ALTTURID grouping ---------- */
-.vt-group-start td {
-  border-top: 2px solid #2563eb !important;
+.vt-card.vt-group-start {
+  border-top: 2px solid #2563eb;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+  margin-bottom: 0;
 }
 
-.vt-group-member td:first-child {
-  box-shadow: inset 4px 0 0 0 #2563eb;
+.vt-card.vt-group-member {
+  border-left-color: #2563eb;
 }
 
-.vt-group-end td {
-  border-bottom: 2px solid #2563eb !important;
+.vt-card.vt-group-end {
+  border-bottom: 2px solid #2563eb;
 }
 
 .vt-group-badge {
   display: inline-block;
-  padding: 2px 6px;
+  padding: 1px 5px;
   border-radius: 4px;
   background: rgba(37, 99, 235, 0.15);
   color: #60a5fa;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
-  margin-left: 6px;
 }
 
 /* ---------- Status badges ---------- */
 .vt-status-badge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
+  padding: 2px 8px;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.3px;
   white-space: nowrap;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .vt-status--under-sending {
@@ -366,74 +454,53 @@
   animation: vt-badge-pulse 1.5s infinite;
 }
 
-.vt-status--ja-svar {
-  background: rgba(34, 197, 94, 0.12);
-  color: #86efac;
-}
+.vt-status--ja-svar { background: rgba(34, 197, 94, 0.12); color: #86efac; }
+.vt-status--klar-fakturering { background: rgba(107, 114, 128, 0.15); color: #9ca3af; }
+.vt-status--kontant { background: rgba(107, 114, 128, 0.15); color: #9ca3af; }
+.vt-status--kreditt { background: rgba(107, 114, 128, 0.15); color: #9ca3af; }
+.vt-status--endret { background: rgba(249, 115, 22, 0.15); color: #fdba74; }
+.vt-status--beh-manuelt { background: rgba(139, 92, 246, 0.15); color: #c4b5fd; }
+.vt-status--add-ons { background: rgba(37, 99, 235, 0.12); color: #93c5fd; }
+.vt-status--default { background: rgba(107, 114, 128, 0.1); color: #9ca3af; }
 
-.vt-status--klar-fakturering {
-  background: rgba(107, 114, 128, 0.15);
-  color: #9ca3af;
-}
-
-.vt-status--kontant {
-  background: rgba(107, 114, 128, 0.15);
-  color: #9ca3af;
-}
-
-.vt-status--kreditt {
-  background: rgba(107, 114, 128, 0.15);
-  color: #9ca3af;
-}
-
-.vt-status--endret {
-  background: rgba(249, 115, 22, 0.15);
-  color: #fdba74;
-}
-
-.vt-status--beh-manuelt {
-  background: rgba(139, 92, 246, 0.15);
-  color: #c4b5fd;
-}
-
-.vt-status--add-ons {
-  background: rgba(37, 99, 235, 0.12);
-  color: #93c5fd;
-}
-
-.vt-status--default {
-  background: rgba(107, 114, 128, 0.1);
-  color: #9ca3af;
-}
-
-/* ---------- UTROP time emphasis ---------- */
+/* ---------- Time & taxi styles ---------- */
 .vt-utrop-time {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.5px;
 }
 
 .vt-oppmote-time {
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
+  color: #93a3bf;
 }
 
-/* ---------- Taxi number ---------- */
 .vt-taxi-num {
   font-weight: 700;
-  font-size: 15px;
+  font-size: 14px;
   color: #e0e4ea;
 }
 
-/* ---------- Animations ---------- */
-@keyframes vt-pulse-row {
-  0%, 100% { background: transparent; }
-  50% { background: rgba(239, 68, 68, 0.04); }
+/* ---------- Countdown badge ---------- */
+.vt-countdown {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  animation: vt-badge-pulse 1.5s infinite;
 }
 
-@keyframes vt-glow-yellow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
-  50% { box-shadow: 0 0 12px 2px rgba(251, 191, 36, 0.1); }
+/* ---------- Animations ---------- */
+@keyframes vt-pulse-card {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  50% { box-shadow: 0 0 8px 2px rgba(239, 68, 68, 0.1); }
 }
 
 @keyframes vt-badge-pulse {
@@ -447,27 +514,36 @@
 }
 
 @keyframes vt-fade-in {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.vt-row-enter {
-  animation: vt-fade-in 0.3s ease-out;
+.vt-card-enter {
+  animation: vt-fade-in 0.25s ease-out;
 }
 
-/* ---------- Toggle button (always visible) ---------- */
+@keyframes vt-flash-new {
+  0% { box-shadow: 0 0 12px 4px rgba(34, 197, 94, 0.3); }
+  100% { box-shadow: none; }
+}
+
+.vt-card-new {
+  animation: vt-flash-new 1.5s ease-out !important;
+}
+
+/* ---------- Toggle button ---------- */
 #vt-toggle-btn {
   position: fixed;
   bottom: 20px;
   right: 20px;
   z-index: 1000000;
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   border: 2px solid #fbbf24;
   background: #1a1f2e;
   color: #fbbf24;
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   cursor: pointer;
   display: flex;
@@ -481,28 +557,6 @@
   background: #fbbf24;
   color: #0b0e14;
   transform: scale(1.08);
-}
-
-/* ---------- Mute indicator ---------- */
-#vt-mute-btn {
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid #1e2536;
-  background: #161b28;
-  color: #93a3bf;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-#vt-mute-btn:hover {
-  background: #1e2536;
-}
-
-#vt-mute-btn.muted {
-  background: rgba(239, 68, 68, 0.15);
-  border-color: #ef4444;
-  color: #fca5a5;
 }
 
 /* ---------- Empty state ---------- */
@@ -526,25 +580,23 @@
 /* ---------- Scroll indicator ---------- */
 #vt-scroll-indicator {
   position: fixed;
-  bottom: 80px;
+  bottom: 76px;
   right: 20px;
   z-index: 1000000;
-  padding: 8px 14px;
+  padding: 6px 12px;
   border-radius: 8px;
   background: rgba(26, 31, 46, 0.9);
   border: 1px solid #1e2536;
   color: #6b7a94;
-  font-size: 12px;
+  font-size: 11px;
   opacity: 0;
   transition: opacity 0.3s;
   pointer-events: none;
 }
 
-#vt-scroll-indicator.visible {
-  opacity: 1;
-}
+#vt-scroll-indicator.visible { opacity: 1; }
 
-/* ---------- Header right (clock + date) ---------- */
+/* ---------- Header right ---------- */
 #vt-header-right {
   display: flex;
   flex-direction: column;
@@ -553,9 +605,8 @@
 }
 
 #vt-date {
-  font-size: 12px;
+  font-size: 11px;
   color: #4b5563;
-  letter-spacing: 0.3px;
 }
 
 /* ---------- Status indicator ---------- */
@@ -575,149 +626,17 @@
   border-radius: 50%;
 }
 
-.vt-indicator--connected {
-  background: rgba(34, 197, 94, 0.1);
-  color: #86efac;
-}
-.vt-indicator--connected .vt-indicator-dot {
-  background: #22c55e;
-  animation: vt-pulse-dot 2s infinite;
-}
+.vt-indicator--connected { background: rgba(34, 197, 94, 0.1); color: #86efac; }
+.vt-indicator--connected .vt-indicator-dot { background: #22c55e; animation: vt-pulse-dot 2s infinite; }
+.vt-indicator--searching { background: rgba(251, 191, 36, 0.1); color: #fbbf24; }
+.vt-indicator--searching .vt-indicator-dot { background: #fbbf24; animation: vt-pulse-dot 1s infinite; }
+.vt-indicator--empty { background: rgba(107, 114, 128, 0.1); color: #9ca3af; }
+.vt-indicator--empty .vt-indicator-dot { background: #6b7280; }
 
-.vt-indicator--searching {
-  background: rgba(251, 191, 36, 0.1);
-  color: #fbbf24;
-}
-.vt-indicator--searching .vt-indicator-dot {
-  background: #fbbf24;
-  animation: vt-pulse-dot 1s infinite;
-}
-
-.vt-indicator--empty {
-  background: rgba(107, 114, 128, 0.1);
-  color: #9ca3af;
-}
-.vt-indicator--empty .vt-indicator-dot {
-  background: #6b7280;
-}
-
-/* ---------- New booking flash ---------- */
-@keyframes vt-flash-new {
-  0% { background: rgba(34, 197, 94, 0.25); }
-  100% { background: transparent; }
-}
-
-.vt-row-new td {
-  animation: vt-flash-new 1.5s ease-out !important;
-}
-
-/* ---------- Last update timestamp ---------- */
+/* ---------- Last update ---------- */
 #vt-last-update {
   font-size: 11px;
   color: #374151;
-  letter-spacing: 0.2px;
-}
-
-/* ---------- Sortable headers ---------- */
-.vt-th-sortable {
-  cursor: pointer;
-  user-select: none;
-  transition: color 0.15s;
-}
-
-.vt-th-sortable:hover {
-  color: #93a3bf;
-}
-
-.vt-th-active {
-  color: #60a5fa !important;
-}
-
-/* ---------- Row expansion ---------- */
-#vt-table tbody tr[data-id] {
-  cursor: pointer;
-}
-
-.vt-row-expanded td {
-  border-bottom-color: #2563eb !important;
-}
-
-.vt-detail-row td {
-  background: #0f1219 !important;
-  padding: 16px 20px !important;
-  border-radius: 0 0 8px 8px !important;
-  white-space: normal !important;
-}
-
-.vt-detail-grid {
-  display: grid;
-  grid-template-columns: 140px 1fr 140px 1fr;
-  gap: 8px 16px;
-  font-size: 13px;
-}
-
-.vt-detail-label {
-  color: #6b7a94;
-  font-weight: 600;
-  text-transform: uppercase;
-  font-size: 10px;
-  letter-spacing: 0.5px;
-  align-self: center;
-}
-
-.vt-detail-value {
-  color: #d4d8e0;
-  word-break: break-word;
-}
-
-/* ---------- Cell truncation ---------- */
-.vt-cell-truncate {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-#vt-table tbody td {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* ---------- Countdown badge ---------- */
-.vt-countdown {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: rgba(251, 191, 36, 0.15);
-  color: #fbbf24;
-  font-size: 11px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.5px;
-  animation: vt-badge-pulse 1.5s infinite;
-}
-
-/* ---------- Debug button ---------- */
-#vt-debug-btn {
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid #1e2536;
-  background: #161b28;
-  color: #93a3bf;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.15s;
-  white-space: nowrap;
-}
-
-#vt-debug-btn:hover {
-  background: #1e2536;
-  color: #d4d8e0;
-}
-
-#vt-debug-btn.active {
-  background: rgba(251, 191, 36, 0.15);
-  border-color: #fbbf24;
-  color: #fbbf24;
 }
 
 /* ---------- Debug panel ---------- */
@@ -733,151 +652,30 @@
   flex-shrink: 0;
 }
 
-#vt-debug-panel strong {
-  color: #d4d8e0;
-}
+#vt-debug-panel strong { color: #d4d8e0; }
 
-/* ---------- Fullscreen button ---------- */
-#vt-fullscreen-btn {
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid #1e2536;
-  background: #161b28;
-  color: #93a3bf;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.15s;
-  white-space: nowrap;
-}
-
-#vt-fullscreen-btn:hover {
-  background: #1e2536;
-  color: #d4d8e0;
-}
-
-/* ---------- Fullscreen mode ---------- */
-#vt-wallboard:fullscreen {
-  background: #0b0e14;
-}
-
-#vt-wallboard:fullscreen #vt-table tbody td {
-  padding: 14px 16px;
-  font-size: 16px;
-}
-
-#vt-wallboard:fullscreen .vt-utrop-time {
-  font-size: 20px;
-}
-
-#vt-wallboard:fullscreen .vt-taxi-num {
-  font-size: 18px;
-}
-
-#vt-wallboard:fullscreen #vt-clock {
-  font-size: 36px;
-}
-
-#vt-wallboard:fullscreen .vt-status-badge {
-  font-size: 14px;
-  padding: 4px 12px;
-}
-
-#vt-wallboard:fullscreen #vt-table thead th {
-  padding: 12px 16px;
-  font-size: 13px;
-}
+/* ---------- Fullscreen ---------- */
+#vt-wallboard:fullscreen { background: #0b0e14; }
+#vt-wallboard:fullscreen .vt-utrop-time { font-size: 18px; }
+#vt-wallboard:fullscreen .vt-taxi-num { font-size: 16px; }
+#vt-wallboard:fullscreen #vt-clock { font-size: 36px; }
+#vt-wallboard:fullscreen .vt-card { padding: 14px 18px; }
 
 /* ---------- Responsive ---------- */
-@media (max-width: 1200px) {
-  #vt-table tbody td,
-  #vt-table thead th {
-    padding: 8px 8px;
-    font-size: 13px;
-  }
-  .vt-utrop-time {
-    font-size: 14px;
-  }
-}
-
 @media (max-width: 900px) {
-  #vt-header {
-    padding: 8px 12px;
-  }
-  #vt-header-left {
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-  #vt-logo {
-    font-size: 16px;
-  }
-  #vt-clock {
-    font-size: 20px;
-  }
-  #vt-stats {
-    padding: 6px 12px;
-    gap: 6px;
-  }
-  .vt-stat {
-    padding: 4px 8px;
-    font-size: 11px;
-  }
-  .vt-stat-value {
-    font-size: 14px;
-  }
-  #vt-filter-bar {
-    padding: 6px 12px;
-    gap: 6px;
-    flex-wrap: wrap;
-  }
-  #vt-search {
-    max-width: 100%;
-    flex-basis: 100%;
-    order: -1;
-  }
-  .vt-filter-btn {
-    padding: 4px 10px;
-    font-size: 11px;
-  }
-  #vt-table-wrap {
-    padding: 0 8px 8px;
-  }
-  #vt-table tbody td {
-    padding: 6px 6px;
-    font-size: 12px;
-  }
-  #vt-table thead th {
-    padding: 6px 6px;
-    font-size: 10px;
-  }
-  .vt-utrop-time {
-    font-size: 13px;
-  }
-  .vt-taxi-num {
-    font-size: 13px;
-  }
-  .vt-cell-truncate {
-    max-width: 100px;
-  }
-  .vt-detail-grid {
-    grid-template-columns: 100px 1fr;
-  }
-  .vt-countdown {
-    display: none;
-  }
-  #vt-status-indicator {
-    display: none;
-  }
-  #vt-last-update {
-    display: none;
-  }
-}
-
-@media (max-width: 600px) {
-  #vt-table thead th:nth-child(n+8),
-  #vt-table tbody td:nth-child(n+8) {
-    display: none;
-  }
-  .vt-cell-truncate {
-    max-width: 70px;
-  }
+  #vt-header { padding: 8px 12px; }
+  #vt-header-left { gap: 8px; flex-wrap: wrap; }
+  #vt-logo { font-size: 16px; }
+  #vt-clock { font-size: 20px; }
+  #vt-stats { padding: 6px 12px; gap: 6px; }
+  .vt-stat { padding: 4px 8px; font-size: 11px; }
+  .vt-stat-value { font-size: 14px; }
+  #vt-filter-bar { padding: 6px 12px; gap: 6px; }
+  #vt-search { max-width: 100%; flex-basis: 100%; order: -1; }
+  .vt-filter-btn { padding: 4px 8px; font-size: 11px; }
+  #vt-cards-wrap { padding: 8px 12px 12px; }
+  .vt-card { padding: 8px 10px; }
+  .vt-card-addr { flex-direction: column; gap: 2px; }
+  #vt-status-indicator { display: none; }
+  #vt-last-update { display: none; }
 }
