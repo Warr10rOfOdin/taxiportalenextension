@@ -29,6 +29,114 @@
   pointer-events: none;
 }
 
+/* ---------- Toolbar wrapper ---------- */
+#vt-toolbar {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+/* ---------- Rotation (portrait mode for landscape monitors) ---------- */
+#vt-wallboard.vt-rotated {
+  transform: rotate(90deg);
+  transform-origin: top left;
+  width: 100vh;
+  height: 100vw;
+  left: 100vw;
+  top: 0;
+}
+
+/* ---------- Sidebar mode ---------- */
+#vt-wallboard.vt-sidebar-mode {
+  flex-direction: row;
+}
+
+#vt-wallboard.vt-sidebar-mode #vt-toolbar {
+  width: 170px;
+  min-width: 170px;
+  border-right: 1px solid #1e2536;
+  border-bottom: none;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #0f1219;
+}
+
+#vt-wallboard.vt-sidebar-mode #vt-header {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 6px 8px;
+}
+
+#vt-wallboard.vt-sidebar-mode #vt-header-left {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+}
+
+#vt-wallboard.vt-sidebar-mode #vt-header-right {
+  flex-direction: row-reverse;
+  gap: 6px;
+  width: 100%;
+}
+
+#vt-wallboard.vt-sidebar-mode #vt-clock {
+  font-size: 22px;
+}
+
+#vt-wallboard.vt-sidebar-mode #vt-stats {
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 8px;
+}
+
+#vt-wallboard.vt-sidebar-mode .vt-stat {
+  width: 100%;
+  justify-content: space-between;
+}
+
+#vt-wallboard.vt-sidebar-mode #vt-filter-bar {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  padding: 4px 8px;
+}
+
+#vt-wallboard.vt-sidebar-mode #vt-search {
+  max-width: none;
+  width: 100%;
+}
+
+#vt-wallboard.vt-sidebar-mode .vt-sort-wrap {
+  margin-left: 0;
+  width: 100%;
+}
+
+#vt-wallboard.vt-sidebar-mode #vt-sort-select {
+  flex: 1;
+}
+
+#vt-wallboard.vt-sidebar-mode .vt-sidebar-btn-row {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+#vt-wallboard.vt-sidebar-mode #vt-cards-wrap {
+  padding: 4px 8px 8px;
+}
+
+#vt-wallboard.vt-sidebar-mode #vt-toolbar::-webkit-scrollbar { width: 4px; }
+#vt-wallboard.vt-sidebar-mode #vt-toolbar::-webkit-scrollbar-track { background: #0f1219; }
+#vt-wallboard.vt-sidebar-mode #vt-toolbar::-webkit-scrollbar-thumb { background: #2a3042; border-radius: 2px; }
+
+/* Sidebar + rotated combination */
+#vt-wallboard.vt-sidebar-mode.vt-rotated #vt-toolbar {
+  width: 150px;
+  min-width: 150px;
+}
+
 /* ---------- Header ---------- */
 #vt-header {
   display: flex;
@@ -206,10 +314,8 @@
 #vt-sort-dir:hover,
 #vt-sort-select:hover { background: #1e2536; color: #d4d8e0; }
 
-/* Toolbar icon buttons (mute, fullscreen, debug) */
-#vt-mute-btn,
-#vt-fullscreen-btn,
-#vt-debug-btn {
+/* Toolbar icon buttons */
+.vt-toolbar-btn {
   width: 24px;
   height: 24px;
   border-radius: 4px;
@@ -225,9 +331,7 @@
   padding: 0;
 }
 
-#vt-mute-btn:hover,
-#vt-fullscreen-btn:hover,
-#vt-debug-btn:hover {
+.vt-toolbar-btn:hover {
   background: #1e2536;
   color: #d4d8e0;
 }
@@ -238,7 +342,9 @@
   color: #fca5a5;
 }
 
-#vt-debug-btn.active {
+#vt-debug-btn.active,
+#vt-layout-btn.active,
+#vt-rotate-btn.active {
   background: rgba(251, 191, 36, 0.15);
   border-color: #fbbf24;
   color: #fbbf24;

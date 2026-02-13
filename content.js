@@ -98,6 +98,8 @@
   let isFullscreen = false;
   let debugVisible = false;
   let lastDiagnostics = null;
+  let layoutMode = 'top';    // 'top' | 'side'
+  let rotated = false;
 
   // Consistent taxi number → color mapping
   const taxiColorCache = {};
@@ -659,40 +661,44 @@
     const wb = document.createElement('div');
     wb.id = 'vt-wallboard';
     wb.innerHTML =
-      '<div id="vt-header">' +
-        '<div id="vt-header-left">' +
-          '<div id="vt-logo">Voss <span>Taxi</span> Wallboard</div>' +
-          '<div id="vt-status-indicator" class="vt-indicator--searching" title="Connection status">' +
-            '<span class="vt-indicator-dot"></span>' +
-            '<span class="vt-indicator-text">Searching...</span>' +
+      '<div id="vt-toolbar">' +
+        '<div id="vt-header">' +
+          '<div id="vt-header-left">' +
+            '<div id="vt-logo">Voss <span>Taxi</span> Wallboard</div>' +
+            '<div id="vt-status-indicator" class="vt-indicator--searching" title="Connection status">' +
+              '<span class="vt-indicator-dot"></span>' +
+              '<span class="vt-indicator-text">Searching...</span>' +
+            '</div>' +
+            '<div id="vt-last-update" title="Last data refresh"></div>' +
           '</div>' +
-          '<div id="vt-last-update" title="Last data refresh"></div>' +
+          '<div id="vt-header-right">' +
+            '<div id="vt-date"></div>' +
+            '<div id="vt-clock">00:00:00</div>' +
+          '</div>' +
         '</div>' +
-        '<div id="vt-header-right">' +
-          '<div id="vt-date"></div>' +
-          '<div id="vt-clock">00:00:00</div>' +
+        '<div id="vt-stats"></div>' +
+        '<div id="vt-filter-bar">' +
+          '<input type="text" id="vt-search" placeholder="Search... (Ctrl+F)" autocomplete="off" />' +
+          '<button class="vt-filter-btn active" data-filter="all">All</button>' +
+          '<button class="vt-filter-btn" data-filter="active">Active</button>' +
+          '<button class="vt-filter-btn" data-filter="sending">Sending</button>' +
+          '<button class="vt-filter-btn" data-filter="upcoming">Upcoming</button>' +
+          '<button class="vt-filter-btn" data-filter="completed">Done</button>' +
+          '<span class="vt-sort-wrap">' +
+            '<label for="vt-sort-select" class="vt-sort-label">Sort:</label>' +
+            '<select id="vt-sort-select">' + sortOptionsHtml + '</select>' +
+            '<button id="vt-sort-dir" title="Toggle sort direction">' +
+              (sortDirection === 'asc' ? '\u25b2' : '\u25bc') +
+            '</button>' +
+          '</span>' +
+          '<button id="vt-layout-btn" class="vt-toolbar-btn" title="Toggle sidebar (L)">&#x2261;</button>' +
+          '<button id="vt-rotate-btn" class="vt-toolbar-btn" title="Rotate (R)">&#x21BB;</button>' +
+          '<button id="vt-mute-btn" class="vt-toolbar-btn" title="Mute (M)">&#x1f50a;</button>' +
+          '<button id="vt-fullscreen-btn" class="vt-toolbar-btn" title="Fullscreen (F)">&#x26F6;</button>' +
+          '<button id="vt-debug-btn" class="vt-toolbar-btn" title="Debug (D)">&#x1f41b;</button>' +
         '</div>' +
+        '<div id="vt-debug-panel" style="display:none;"></div>' +
       '</div>' +
-      '<div id="vt-stats"></div>' +
-      '<div id="vt-filter-bar">' +
-        '<input type="text" id="vt-search" placeholder="Search... (Ctrl+F)" autocomplete="off" />' +
-        '<button class="vt-filter-btn active" data-filter="all">All</button>' +
-        '<button class="vt-filter-btn" data-filter="active">Active</button>' +
-        '<button class="vt-filter-btn" data-filter="sending">Sending</button>' +
-        '<button class="vt-filter-btn" data-filter="upcoming">Upcoming</button>' +
-        '<button class="vt-filter-btn" data-filter="completed">Done</button>' +
-        '<span class="vt-sort-wrap">' +
-          '<label for="vt-sort-select" class="vt-sort-label">Sort:</label>' +
-          '<select id="vt-sort-select">' + sortOptionsHtml + '</select>' +
-          '<button id="vt-sort-dir" title="Toggle sort direction">' +
-            (sortDirection === 'asc' ? '\u25b2' : '\u25bc') +
-          '</button>' +
-        '</span>' +
-        '<button id="vt-mute-btn" title="Mute (M)">&#x1f50a;</button>' +
-        '<button id="vt-fullscreen-btn" title="Fullscreen (F)">&#x26F6;</button>' +
-        '<button id="vt-debug-btn" title="Debug (D)">&#x1f41b;</button>' +
-      '</div>' +
-      '<div id="vt-debug-panel" style="display:none;"></div>' +
       '<div id="vt-cards-wrap">' +
         '<div id="vt-cards"></div>' +
         '<div id="vt-empty" style="display:none;">' +
@@ -741,6 +747,12 @@
 
     // Debug toggle
     document.getElementById('vt-debug-btn').addEventListener('click', toggleDebug);
+
+    // Layout toggle
+    document.getElementById('vt-layout-btn').addEventListener('click', toggleLayout);
+
+    // Rotate toggle
+    document.getElementById('vt-rotate-btn').addEventListener('click', toggleRotate);
 
     // Mouse/scroll activity tracking — any movement resets idle timer
     const wrap = document.getElementById('vt-cards-wrap');
@@ -791,6 +803,12 @@
       } else if (e.key === 'd' || e.key === 'D') {
         toggleDebug();
         e.preventDefault();
+      } else if (e.key === 'r' || e.key === 'R') {
+        toggleRotate();
+        e.preventDefault();
+      } else if (e.key === 'l' || e.key === 'L') {
+        toggleLayout();
+        e.preventDefault();
       } else if (e.key === 'f' && !e.ctrlKey && !e.metaKey) {
         toggleFullscreen();
         e.preventDefault();
@@ -816,13 +834,21 @@
       }
     });
 
-    // Restore mute preference
-    chrome.storage.local.get('vtMuted', (r) => {
+    // Restore preferences
+    chrome.storage.local.get(['vtMuted', 'vtLayout', 'vtRotated'], (r) => {
       if (r.vtMuted) {
         muted = true;
         const btn = document.getElementById('vt-mute-btn');
         btn.classList.add('muted');
         btn.innerHTML = '&#x1f507;';
+      }
+      if (r.vtLayout === 'side') {
+        layoutMode = 'side';
+        applyLayout();
+      }
+      if (r.vtRotated) {
+        rotated = true;
+        applyRotation();
       }
     });
   }
@@ -872,6 +898,34 @@
     }
     const btn = document.getElementById('vt-debug-btn');
     if (btn) btn.classList.toggle('active', debugVisible);
+  }
+
+  function toggleLayout() {
+    layoutMode = layoutMode === 'top' ? 'side' : 'top';
+    applyLayout();
+    chrome.storage.local.set({ vtLayout: layoutMode });
+  }
+
+  function applyLayout() {
+    const wb = document.getElementById('vt-wallboard');
+    if (!wb) return;
+    wb.classList.toggle('vt-sidebar-mode', layoutMode === 'side');
+    const btn = document.getElementById('vt-layout-btn');
+    if (btn) btn.classList.toggle('active', layoutMode === 'side');
+  }
+
+  function toggleRotate() {
+    rotated = !rotated;
+    applyRotation();
+    chrome.storage.local.set({ vtRotated: rotated });
+  }
+
+  function applyRotation() {
+    const wb = document.getElementById('vt-wallboard');
+    if (!wb) return;
+    wb.classList.toggle('vt-rotated', rotated);
+    const btn = document.getElementById('vt-rotate-btn');
+    if (btn) btn.classList.toggle('active', rotated);
   }
 
   function renderDebugPanel() {
