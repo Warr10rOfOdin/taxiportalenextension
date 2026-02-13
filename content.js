@@ -11,7 +11,7 @@
   //  Constants
   // ----------------------------------------------------------
   const POLL_INTERVAL_MS = 4000;
-  const SCROLL_IDLE_MS = 30000;
+  const SCROLL_IDLE_MS = 45000;
   const UNDER_SENDING_CHIME_MS = 30000;
   const UPCOMING_MINUTES = 5;
   const TIME_WINDOW_HOURS = 24;
@@ -742,11 +742,20 @@
     // Debug toggle
     document.getElementById('vt-debug-btn').addEventListener('click', toggleDebug);
 
-    // Scroll tracking
+    // Mouse/scroll activity tracking — any movement resets idle timer
     const wrap = document.getElementById('vt-cards-wrap');
     wrap.addEventListener('scroll', () => {
       lastScrollTime = Date.now();
       document.getElementById('vt-scroll-indicator').classList.add('visible');
+    });
+    document.addEventListener('mousemove', () => {
+      lastScrollTime = Date.now();
+    });
+    document.addEventListener('mousedown', () => {
+      lastScrollTime = Date.now();
+    });
+    document.addEventListener('touchstart', () => {
+      lastScrollTime = Date.now();
     });
 
     // Card click for detail expansion (delegated)
@@ -1203,11 +1212,19 @@
     const ind = document.getElementById('vt-scroll-indicator');
     if (ind) ind.classList.remove('visible');
 
-    const card = document.querySelector(
-      '#vt-cards .vt-row--sending, #vt-cards .vt-row--upcoming, #vt-cards .vt-row--manual, #vt-cards .vt-row--active'
-    );
-    if (card) {
-      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Find first card whose booking is NOT "KLAR FOR FAKTURERING"
+    const cards = document.querySelectorAll('#vt-cards .vt-card');
+    let target = null;
+    for (const card of cards) {
+      const id = card.getAttribute('data-id');
+      const booking = bookings.find(b => b.id === id);
+      if (booking && booking.status !== 'KLAR FOR FAKTURERING') {
+        target = card;
+        break;
+      }
+    }
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }
 
