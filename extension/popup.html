@@ -5,7 +5,7 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      width: 280px;
+      width: 300px;
       font-family: 'Segoe UI', system-ui, sans-serif;
       background: #0b0e14;
       color: #d4d8e0;
@@ -57,15 +57,40 @@
       background: rgba(249, 115, 22, 0.15);
       color: #fdba74;
     }
-    .link {
-      display: block;
-      text-align: center;
-      margin-top: 12px;
-      font-size: 12px;
-      color: #60a5fa;
-      text-decoration: none;
+    .badge-red {
+      background: rgba(239, 68, 68, 0.15);
+      color: #fca5a5;
     }
-    .link:hover { text-decoration: underline; }
+    .badge-blue {
+      background: rgba(59, 130, 246, 0.15);
+      color: #93c5fd;
+    }
+    .badge-yellow {
+      background: rgba(251, 191, 36, 0.15);
+      color: #fde68a;
+    }
+    .badge-gray {
+      background: rgba(107, 114, 128, 0.15);
+      color: #9ca3af;
+    }
+    .shortcuts {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 4px 12px;
+      font-size: 12px;
+    }
+    .shortcuts kbd {
+      background: #1e2536;
+      border: 1px solid #2a3042;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-family: monospace;
+      font-size: 11px;
+      color: #93a3bf;
+    }
+    .shortcuts span {
+      color: #6b7a94;
+    }
     .footer {
       margin-top: 16px;
       text-align: center;
@@ -82,7 +107,7 @@
     <div class="section-title">Status</div>
     <div class="info-row">
       <span>Extension</span>
-      <span class="badge badge-ok">Active</span>
+      <span id="status-badge" class="badge badge-warn">Checking...</span>
     </div>
     <div class="info-row">
       <span>Version</span>
@@ -90,26 +115,40 @@
     </div>
   </div>
 
-  <div class="section">
-    <div class="section-title">Usage</div>
+  <div id="stats-section" class="section" style="display:none;">
+    <div class="section-title">Live Stats</div>
     <div class="info-row">
-      <span>Toggle overlay</span>
-      <span style="color:#fbbf24;font-weight:600;">VT button</span>
+      <span>Total bookings</span>
+      <span id="stat-total" class="badge badge-blue">0</span>
     </div>
     <div class="info-row">
-      <span>Mute audio</span>
-      <span>Sound button</span>
+      <span>Under Sending</span>
+      <span id="stat-sending" class="badge badge-red">0</span>
     </div>
     <div class="info-row">
-      <span>Filter bookings</span>
-      <span>Filter bar</span>
+      <span>Upcoming</span>
+      <span id="stat-upcoming" class="badge badge-yellow">0</span>
+    </div>
+    <div class="info-row">
+      <span>Completed</span>
+      <span id="stat-completed" class="badge badge-gray">0</span>
     </div>
   </div>
 
   <div class="section">
-    <div class="section-title">Notes</div>
+    <div class="section-title">Keyboard Shortcuts</div>
+    <div class="shortcuts">
+      <kbd>Esc</kbd>   <span>Toggle overlay</span>
+      <kbd>M</kbd>     <span>Mute/unmute audio</span>
+      <kbd>Ctrl+F</kbd><span>Focus search</span>
+      <kbd>1-5</kbd>   <span>Switch filter tabs</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Info</div>
     <div style="font-size:12px;color:#6b7a94;line-height:1.5;">
-      Open <strong style="color:#d4d8e0;">TripViewCentral.aspx</strong> on Taxiportalen to activate the wallboard. The overlay reads data directly from the page — no API calls are made.
+      Open <strong style="color:#d4d8e0;">TripViewCentral.aspx</strong> on Taxiportalen to activate. The overlay reads data from the page DOM — no external API calls.
     </div>
   </div>
 

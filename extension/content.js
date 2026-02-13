@@ -1,5 +1,5 @@
 // ============================================================
-//  Voss Taxi Wallboard — Content Script  v1.1
+//  Voss Taxi Wallboard — Content Script  v1.2
 //  Reads booking data from Taxiportalen DOM and renders a
 //  dark-mode dispatch wallboard overlay.
 // ============================================================
@@ -17,6 +17,7 @@
   const TIME_WINDOW_HOURS = 24;
   const UTROP_BUCKET_SIZE = 5;
   const MUTATION_DEBOUNCE_MS = 300;
+  const BADGE_UPDATE_MS = 5000;
 
   // Recognised column names → normalised keys
   const COLUMN_MAP = {
@@ -56,6 +57,21 @@
     'ADD-ONS': 'add-ons',
   };
 
+  // Column definitions for the overlay table
+  const TABLE_COLUMNS = [
+    { key: 'utrop',        label: 'UTROP',          sortKey: 'utrop'         },
+    { key: 'oppmote',      label: 'OPPMOTE',        sortKey: 'oppmote'       },
+    { key: 'taxi',         label: 'TAXI',           sortKey: 'taxi'          },
+    { key: 'status',       label: 'STATUS',         sortKey: 'status'        },
+    { key: 'fra',          label: 'FRA',            sortKey: 'fra'           },
+    { key: 'til',          label: 'TIL',            sortKey: 'til'           },
+    { key: 'navn',         label: 'NAVN',           sortKey: 'navn'          },
+    { key: 'tlf',          label: 'TLF',            sortKey: 'tlf'           },
+    { key: 'meldingTilBil',label: 'MELDING TIL BIL',sortKey: 'meldingTilBil' },
+    { key: 'egenskap',     label: 'EGENSKAP',       sortKey: 'egenskap'      },
+    { key: 'altturid',     label: 'ALTTURID',       sortKey: 'altturid'      },
+  ];
+
   const WEEKDAYS_NO = ['Sondag', 'Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lordag'];
   const MONTHS_NO = ['jan', 'feb', 'mar', 'apr', 'mai', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'des'];
 
@@ -76,6 +92,9 @@
   let lastParseTime = 0;
   let parseCount = 0;
   let tableFound = false;
+  let expandedRowId = null;
+  let sortColumn = 'utrop';    // default sort
+  let sortDirection = 'asc';   // asc | desc
 
   // Audio context (created on first user interaction)
   let audioCtx = null;
@@ -92,10 +111,23 @@
     return pad(date.getHours()) + ':' + pad(date.getMinutes());
   }
 
+  function formatFullTime24(date) {
+    if (!(date instanceof Date) || isNaN(date)) return '\u2014';
+    return pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds());
+  }
+
   function formatDate(date) {
     return WEEKDAYS_NO[date.getDay()] + ' ' +
       date.getDate() + '. ' + MONTHS_NO[date.getMonth()] + ' ' +
       date.getFullYear();
+  }
+
+  function timeSince(ts) {
+    if (!ts) return 'never';
+    const secs = Math.floor((Date.now() - ts) / 1000);
+    if (secs < 5) return 'just now';
+    if (secs < 60) return secs + 's ago';
+    return Math.floor(secs / 60) + 'm ago';
   }
 
   function parseTimeString(str) {
@@ -192,20 +224,17 @@
   }
 
   function playUtropChime() {
-    // Pleasant two-note ascending chime
     playTone(880, 0.15, 'sine', 0);
     playTone(1100, 0.22, 'sine', 0.16);
   }
 
   function playUnderSendingChime() {
-    // Urgent three-note alert
     playTone(520, 0.2, 'triangle', 0);
     playTone(520, 0.2, 'triangle', 0.28);
     playTone(660, 0.3, 'triangle', 0.56);
   }
 
   function playNewBookingSound() {
-    // Soft notification blip
     playTone(700, 0.08, 'sine', 0);
     playTone(900, 0.12, 'sine', 0.1);
   }
@@ -287,7 +316,6 @@
 
       booking.id = bookingId(booking);
 
-      // Filter by time window using oppmote
       if (booking.oppmote && !isWithinWindow(booking.oppmote)) continue;
 
       results.push(booking);
@@ -301,13 +329,25 @@
   // ----------------------------------------------------------
   //  Sorting & Grouping
   // ----------------------------------------------------------
+  function compareValues(a, b, key, dir) {
+    let va, vb;
+    if (key === 'utrop') {
+      va = a.utrop ? a.utrop.getTime() : Infinity;
+      vb = b.utrop ? b.utrop.getTime() : Infinity;
+    } else if (key === 'oppmote') {
+      va = a.oppmote ? a.oppmote.getTime() : Infinity;
+      vb = b.oppmote ? b.oppmote.getTime() : Infinity;
+    } else {
+      va = (a[key] || '').toLowerCase();
+      vb = (b[key] || '').toLowerCase();
+    }
+    if (va < vb) return dir === 'asc' ? -1 : 1;
+    if (va > vb) return dir === 'asc' ? 1 : -1;
+    return 0;
+  }
+
   function sortBookings(list) {
-    // Sort by UTROP ascending
-    list.sort((a, b) => {
-      const ta = a.utrop ? a.utrop.getTime() : Infinity;
-      const tb = b.utrop ? b.utrop.getTime() : Infinity;
-      return ta - tb;
-    });
+    list.sort((a, b) => compareValues(a, b, sortColumn, sortDirection));
 
     // Group ALTTURID siblings adjacent
     const grouped = [];
@@ -393,7 +433,7 @@
   //  Build Overlay DOM
   // ----------------------------------------------------------
   function createOverlay() {
-    // Toggle button (always visible)
+    // Toggle button
     const toggle = document.createElement('button');
     toggle.id = 'vt-toggle-btn';
     toggle.textContent = 'VT';
@@ -410,59 +450,55 @@
     scrollInd.textContent = 'Auto-scroll paused';
     document.body.appendChild(scrollInd);
 
+    // Build header HTML for sortable columns
+    let theadHtml = '';
+    for (const col of TABLE_COLUMNS) {
+      const isActive = sortColumn === col.sortKey;
+      const arrow = isActive ? (sortDirection === 'asc' ? ' \u25b2' : ' \u25bc') : '';
+      theadHtml += '<th class="vt-th-sortable' + (isActive ? ' vt-th-active' : '') +
+        '" data-sort="' + col.sortKey + '">' + col.label + arrow + '</th>';
+    }
+
     // Main wallboard
     const wb = document.createElement('div');
     wb.id = 'vt-wallboard';
-    wb.innerHTML = `
-      <div id="vt-header">
-        <div id="vt-header-left">
-          <div id="vt-logo">Voss <span>Taxi</span> Wallboard</div>
-          <div id="vt-status-indicator" class="vt-indicator--searching" title="Connection status">
-            <span class="vt-indicator-dot"></span>
-            <span class="vt-indicator-text">Searching...</span>
-          </div>
-        </div>
-        <div id="vt-header-right">
-          <div id="vt-date"></div>
-          <div id="vt-clock">00:00:00</div>
-        </div>
-      </div>
-      <div id="vt-stats"></div>
-      <div id="vt-filter-bar">
-        <input type="text" id="vt-search" placeholder="Search name, taxi, address, phone... (Ctrl+F)" autocomplete="off" />
-        <button class="vt-filter-btn active" data-filter="all">All</button>
-        <button class="vt-filter-btn" data-filter="active">Active</button>
-        <button class="vt-filter-btn" data-filter="sending">Under Sending</button>
-        <button class="vt-filter-btn" data-filter="upcoming">Upcoming</button>
-        <button class="vt-filter-btn" data-filter="completed">Completed</button>
-        <button id="vt-mute-btn" title="Mute/unmute audio alerts (M)">&#x1f50a; Sound</button>
-      </div>
-      <div id="vt-table-wrap">
-        <table id="vt-table">
-          <thead>
-            <tr>
-              <th>UTROP</th>
-              <th>OPPMOTE</th>
-              <th>TAXI</th>
-              <th>STATUS</th>
-              <th>FRA</th>
-              <th>TIL</th>
-              <th>NAVN</th>
-              <th>TLF</th>
-              <th>MELDING TIL BIL</th>
-              <th>EGENSKAP</th>
-              <th>ALTTURID</th>
-            </tr>
-          </thead>
-          <tbody id="vt-tbody"></tbody>
-        </table>
-        <div id="vt-empty" style="display:none;">
-          <div id="vt-empty-icon">&#x1f697;</div>
-          <div>No bookings to display</div>
-          <div style="font-size:13px;color:#374151;">Waiting for data from Taxiportalen...</div>
-        </div>
-      </div>
-    `;
+    wb.innerHTML =
+      '<div id="vt-header">' +
+        '<div id="vt-header-left">' +
+          '<div id="vt-logo">Voss <span>Taxi</span> Wallboard</div>' +
+          '<div id="vt-status-indicator" class="vt-indicator--searching" title="Connection status">' +
+            '<span class="vt-indicator-dot"></span>' +
+            '<span class="vt-indicator-text">Searching...</span>' +
+          '</div>' +
+          '<div id="vt-last-update" title="Last data refresh"></div>' +
+        '</div>' +
+        '<div id="vt-header-right">' +
+          '<div id="vt-date"></div>' +
+          '<div id="vt-clock">00:00:00</div>' +
+        '</div>' +
+      '</div>' +
+      '<div id="vt-stats"></div>' +
+      '<div id="vt-filter-bar">' +
+        '<input type="text" id="vt-search" placeholder="Search name, taxi, address, phone... (Ctrl+F)" autocomplete="off" />' +
+        '<button class="vt-filter-btn active" data-filter="all">All</button>' +
+        '<button class="vt-filter-btn" data-filter="active">Active</button>' +
+        '<button class="vt-filter-btn" data-filter="sending">Under Sending</button>' +
+        '<button class="vt-filter-btn" data-filter="upcoming">Upcoming</button>' +
+        '<button class="vt-filter-btn" data-filter="completed">Completed</button>' +
+        '<button id="vt-mute-btn" title="Mute/unmute audio alerts (M)">&#x1f50a; Sound</button>' +
+      '</div>' +
+      '<div id="vt-table-wrap">' +
+        '<table id="vt-table">' +
+          '<thead><tr>' + theadHtml + '</tr></thead>' +
+          '<tbody id="vt-tbody"></tbody>' +
+        '</table>' +
+        '<div id="vt-empty" style="display:none;">' +
+          '<div id="vt-empty-icon">&#x1f697;</div>' +
+          '<div>No bookings to display</div>' +
+          '<div style="font-size:13px;color:#374151;">Waiting for data from Taxiportalen...</div>' +
+        '</div>' +
+      '</div>';
+
     document.body.appendChild(wb);
 
     // --- Event listeners ---
@@ -483,6 +519,21 @@
       });
     });
 
+    // Sortable headers
+    document.querySelectorAll('.vt-th-sortable').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.sort;
+        if (sortColumn === key) {
+          sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+          sortColumn = key;
+          sortDirection = 'asc';
+        }
+        updateSortHeaders();
+        renderTable();
+      });
+    });
+
     // Mute toggle
     document.getElementById('vt-mute-btn').addEventListener('click', toggleMute);
 
@@ -493,11 +544,23 @@
       document.getElementById('vt-scroll-indicator').classList.add('visible');
     });
 
+    // Row click for detail expansion
+    document.getElementById('vt-tbody').addEventListener('click', (e) => {
+      const row = e.target.closest('tr[data-id]');
+      if (!row) return;
+      const id = row.getAttribute('data-id');
+      // Toggle expansion
+      if (expandedRowId === id) {
+        expandedRowId = null;
+      } else {
+        expandedRowId = id;
+      }
+      renderTable();
+    });
+
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
-      // Don't capture when typing in input
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-        // Escape blurs input
         if (e.key === 'Escape') {
           e.target.blur();
           e.preventDefault();
@@ -506,13 +569,17 @@
       }
 
       if (e.key === 'Escape') {
-        toggleOverlay();
+        if (expandedRowId) {
+          expandedRowId = null;
+          renderTable();
+        } else {
+          toggleOverlay();
+        }
         e.preventDefault();
       } else if (e.key === 'm' || e.key === 'M') {
         toggleMute();
         e.preventDefault();
       } else if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-        // Focus search
         if (overlayVisible) {
           const search = document.getElementById('vt-search');
           if (search) {
@@ -567,6 +634,17 @@
     renderTable();
   }
 
+  function updateSortHeaders() {
+    document.querySelectorAll('.vt-th-sortable').forEach(th => {
+      const key = th.dataset.sort;
+      const col = TABLE_COLUMNS.find(c => c.sortKey === key);
+      const isActive = sortColumn === key;
+      th.classList.toggle('vt-th-active', isActive);
+      const arrow = isActive ? (sortDirection === 'asc' ? ' \u25b2' : ' \u25bc') : '';
+      th.textContent = (col ? col.label : key) + arrow;
+    });
+  }
+
   // ----------------------------------------------------------
   //  Render
   // ----------------------------------------------------------
@@ -579,33 +657,12 @@
     ).length;
     const completed = displayed.filter(b => COMPLETED_STATUSES.has(b.status)).length;
 
-    document.getElementById('vt-stats').innerHTML = `
-      <div class="vt-stat vt-stat--total">
-        <span class="vt-stat-dot"></span>
-        <span class="vt-stat-value">${total}</span>
-        <span>Total</span>
-      </div>
-      <div class="vt-stat vt-stat--sending">
-        <span class="vt-stat-dot"></span>
-        <span class="vt-stat-value">${sending}</span>
-        <span>Under Sending</span>
-      </div>
-      <div class="vt-stat vt-stat--upcoming">
-        <span class="vt-stat-dot"></span>
-        <span class="vt-stat-value">${upcoming}</span>
-        <span>Upcoming</span>
-      </div>
-      <div class="vt-stat vt-stat--active">
-        <span class="vt-stat-dot"></span>
-        <span class="vt-stat-value">${active}</span>
-        <span>Active</span>
-      </div>
-      <div class="vt-stat vt-stat--completed">
-        <span class="vt-stat-dot"></span>
-        <span class="vt-stat-value">${completed}</span>
-        <span>Completed</span>
-      </div>
-    `;
+    document.getElementById('vt-stats').innerHTML =
+      '<div class="vt-stat vt-stat--total"><span class="vt-stat-dot"></span><span class="vt-stat-value">' + total + '</span><span>Total</span></div>' +
+      '<div class="vt-stat vt-stat--sending"><span class="vt-stat-dot"></span><span class="vt-stat-value">' + sending + '</span><span>Under Sending</span></div>' +
+      '<div class="vt-stat vt-stat--upcoming"><span class="vt-stat-dot"></span><span class="vt-stat-value">' + upcoming + '</span><span>Upcoming</span></div>' +
+      '<div class="vt-stat vt-stat--active"><span class="vt-stat-dot"></span><span class="vt-stat-value">' + active + '</span><span>Active</span></div>' +
+      '<div class="vt-stat vt-stat--completed"><span class="vt-stat-dot"></span><span class="vt-stat-value">' + completed + '</span><span>Completed</span></div>';
   }
 
   function updateStatusIndicator() {
@@ -622,6 +679,42 @@
       el.className = 'vt-indicator--connected';
       el.querySelector('.vt-indicator-text').textContent = 'Live \u2014 ' + bookings.length + ' bookings';
     }
+
+    const upd = document.getElementById('vt-last-update');
+    if (upd && lastParseTime) {
+      upd.textContent = 'Updated ' + timeSince(lastParseTime);
+    }
+  }
+
+  function buildDetailRow(b, colSpan) {
+    const fields = [
+      ['Faktur Nr',       b.fakturnr],
+      ['Taxi',            b.taxi],
+      ['Status',          b.status],
+      ['Utrop',           b.utropRaw || formatTime24(b.utrop)],
+      ['Oppmote',         b.oppmoteRaw || formatTime24(b.oppmote)],
+      ['Behandlingstid',  b.behandlingstid],
+      ['Fra',             b.fra],
+      ['Til',             b.til],
+      ['Navn',            b.navn],
+      ['Telefon',         b.tlf],
+      ['Melding til bil', b.meldingTilBil],
+      ['Betaling',        b.bet],
+      ['Egenskap',        b.egenskap],
+      ['AltTurID',        b.altturid],
+      ['TurID',           b.turid],
+    ];
+
+    let inner = '<div class="vt-detail-grid">';
+    for (const [label, value] of fields) {
+      if (value) {
+        inner += '<div class="vt-detail-label">' + esc(label) + '</div>' +
+                 '<div class="vt-detail-value">' + esc(value) + '</div>';
+      }
+    }
+    inner += '</div>';
+
+    return '<tr class="vt-detail-row"><td colspan="' + colSpan + '">' + inner + '</td></tr>';
   }
 
   function renderTable() {
@@ -650,7 +743,6 @@
       }
     }
 
-    // If any member of an ALTTURID group is active, mark the whole group active
     const groupActive = {};
     for (const [aid, ids] of Object.entries(altGroups)) {
       if (ids.length <= 1) continue;
@@ -659,7 +751,7 @@
       );
     }
 
-    // Detect new bookings for flash animation
+    // Detect new bookings
     const currentIds = new Set(displayed.map(b => b.id));
     const newIds = new Set();
     if (previousBookingIds.size > 0) {
@@ -668,6 +760,7 @@
       }
     }
 
+    const colCount = TABLE_COLUMNS.length;
     let html = '';
     for (let i = 0; i < displayed.length; i++) {
       const b = displayed[i];
@@ -675,8 +768,8 @@
       const ids = isGrouped ? altGroups[b.altturid] : [];
       const isFirst = isGrouped && ids.indexOf(b.id) === 0;
       const isLast = isGrouped && ids.indexOf(b.id) === ids.length - 1;
+      const isExpanded = expandedRowId === b.id;
 
-      // Row class — if group is active, don't dim
       let rClass = rowClass(b);
       if (isGrouped && groupActive[b.altturid] && rClass === 'vt-row--completed') {
         rClass = 'vt-row--active';
@@ -687,32 +780,35 @@
       if (isFirst) classes += ' vt-group-start';
       if (isLast) classes += ' vt-group-end';
       if (newIds.has(b.id)) classes += ' vt-row-new';
+      if (isExpanded) classes += ' vt-row-expanded';
       classes += ' vt-row-enter';
 
       const statusSlug = statusBadgeClass(b.status);
-      const groupBadge = isGrouped
-        ? '<span class="vt-group-badge">G</span>'
-        : '';
+      const groupBadge = isGrouped ? '<span class="vt-group-badge">G</span>' : '';
 
-      html += '<tr class="' + classes + '" data-id="' + escAttr(b.id) + '">' +
+      html += '<tr class="' + classes + '" data-id="' + escAttr(b.id) + '" title="Click for details">' +
         '<td><span class="vt-utrop-time">' + formatTime24(b.utrop) + '</span></td>' +
         '<td><span class="vt-oppmote-time">' + formatTime24(b.oppmote) + '</span></td>' +
         '<td><span class="vt-taxi-num">' + esc(b.taxi) + '</span></td>' +
         '<td><span class="vt-status-badge vt-status--' + statusSlug + '">' + esc(b.status) + '</span></td>' +
-        '<td>' + esc(b.fra) + '</td>' +
-        '<td>' + esc(b.til) + '</td>' +
-        '<td>' + esc(b.navn) + '</td>' +
+        '<td class="vt-cell-truncate" title="' + escAttr(b.fra) + '">' + esc(b.fra) + '</td>' +
+        '<td class="vt-cell-truncate" title="' + escAttr(b.til) + '">' + esc(b.til) + '</td>' +
+        '<td class="vt-cell-truncate" title="' + escAttr(b.navn) + '">' + esc(b.navn) + '</td>' +
         '<td>' + esc(b.tlf) + '</td>' +
-        '<td>' + esc(b.meldingTilBil) + '</td>' +
+        '<td class="vt-cell-truncate" title="' + escAttr(b.meldingTilBil) + '">' + esc(b.meldingTilBil) + '</td>' +
         '<td>' + esc(b.egenskap) + '</td>' +
         '<td>' + esc(b.altturid) + groupBadge + '</td>' +
         '</tr>';
+
+      // Expanded detail row
+      if (isExpanded) {
+        html += buildDetailRow(b, colCount);
+      }
     }
 
     tbody.innerHTML = html;
     previousBookingIds = currentIds;
 
-    // Play a notification for new bookings
     if (newIds.size > 0 && parseCount > 1) {
       playNewBookingSound();
     }
@@ -731,6 +827,11 @@
     if (dateEl) {
       dateEl.textContent = formatDate(n);
     }
+    // Update "last updated" periodically
+    const upd = document.getElementById('vt-last-update');
+    if (upd && lastParseTime) {
+      upd.textContent = 'Updated ' + timeSince(lastParseTime);
+    }
   }
 
   // ----------------------------------------------------------
@@ -744,7 +845,7 @@
       if (bb === cb && !chimePlayed.has(b.id)) {
         chimePlayed.add(b.id);
         playUtropChime();
-        break; // one chime per cycle to avoid noise flood
+        break;
       }
     }
   }
@@ -768,6 +869,22 @@
   }
 
   // ----------------------------------------------------------
+  //  Badge update via messaging to service worker
+  // ----------------------------------------------------------
+  function updateBadge() {
+    try {
+      const sending = bookings.filter(b => b.status === 'UNDER SENDING').length;
+      const upcoming = bookings.filter(b => isUpcoming(b.utrop)).length;
+      chrome.runtime.sendMessage({
+        type: 'vtBadgeUpdate',
+        sendingCount: sending,
+        upcomingCount: upcoming,
+        totalCount: bookings.length,
+      });
+    } catch (_) { /* extension context may be invalidated */ }
+  }
+
+  // ----------------------------------------------------------
   //  Auto-scroll
   // ----------------------------------------------------------
   function checkAutoScroll() {
@@ -776,7 +893,6 @@
     const ind = document.getElementById('vt-scroll-indicator');
     if (ind) ind.classList.remove('visible');
 
-    // Find first active/urgent row
     const row = document.querySelector(
       '#vt-tbody .vt-row--sending, #vt-tbody .vt-row--upcoming, #vt-tbody .vt-row--manual, #vt-tbody .vt-row--active'
     );
@@ -797,6 +913,7 @@
       previousBookingsJSON = json;
       renderTable();
       checkUnderSendingChime();
+      updateBadge();
     }
 
     checkUtropChimes();
@@ -832,29 +949,40 @@
     createOverlay();
     update();
 
-    // Set up observer (with retry)
     let observerReady = setupObserver();
     if (!observerReady) {
       const retryObs = setInterval(() => {
         observerReady = setupObserver();
         if (observerReady) {
           clearInterval(retryObs);
-          update(); // re-parse once observer connects
+          update();
         }
       }, 2000);
     }
 
-    // Polling fallback
     setInterval(update, POLL_INTERVAL_MS);
-
-    // Clock every second
     setInterval(updateClock, 1000);
-
-    // Auto-scroll check
     setInterval(checkAutoScroll, 5000);
+    setInterval(updateBadge, BADGE_UPDATE_MS);
   }
 
-  // Wait for DOM
+  // ----------------------------------------------------------
+  //  Message listener (for popup stats requests)
+  // ----------------------------------------------------------
+  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+    if (msg.type === 'vtGetStats') {
+      const sending = bookings.filter(b => b.status === 'UNDER SENDING').length;
+      const upcoming = bookings.filter(b => isUpcoming(b.utrop)).length;
+      const completed = bookings.filter(b => COMPLETED_STATUSES.has(b.status)).length;
+      sendResponse({
+        total: bookings.length,
+        sending,
+        upcoming,
+        completed,
+      });
+    }
+  });
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
