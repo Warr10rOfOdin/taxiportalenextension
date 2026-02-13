@@ -640,13 +640,19 @@
     scrollInd.textContent = 'Auto-scroll paused';
     document.body.appendChild(scrollInd);
 
-    // Build header HTML for sortable columns
-    let theadHtml = '';
-    for (const col of TABLE_COLUMNS) {
-      const isActive = sortColumn === col.sortKey;
-      const arrow = isActive ? (sortDirection === 'asc' ? ' \u25b2' : ' \u25bc') : '';
-      theadHtml += '<th class="vt-th-sortable' + (isActive ? ' vt-th-active' : '') +
-        '" data-sort="' + col.sortKey + '">' + col.label + arrow + '</th>';
+    // Sort options for the sort dropdown
+    const SORT_OPTIONS = [
+      { key: 'utrop', label: 'Utrop' },
+      { key: 'oppmote', label: 'Oppmote' },
+      { key: 'taxi', label: 'Taxi' },
+      { key: 'status', label: 'Status' },
+      { key: 'fra', label: 'Fra' },
+      { key: 'navn', label: 'Navn' },
+    ];
+    let sortOptionsHtml = '';
+    for (const opt of SORT_OPTIONS) {
+      sortOptionsHtml += '<option value="' + opt.key + '"' +
+        (sortColumn === opt.key ? ' selected' : '') + '>' + opt.label + '</option>';
     }
 
     // Main wallboard
@@ -669,23 +675,26 @@
       '</div>' +
       '<div id="vt-stats"></div>' +
       '<div id="vt-filter-bar">' +
-        '<input type="text" id="vt-search" placeholder="Search name, taxi, address, phone... (Ctrl+F)" autocomplete="off" />' +
+        '<input type="text" id="vt-search" placeholder="Search... (Ctrl+F)" autocomplete="off" />' +
         '<button class="vt-filter-btn active" data-filter="all">All</button>' +
         '<button class="vt-filter-btn" data-filter="active">Active</button>' +
-        '<button class="vt-filter-btn" data-filter="sending">Under Sending</button>' +
+        '<button class="vt-filter-btn" data-filter="sending">Sending</button>' +
         '<button class="vt-filter-btn" data-filter="upcoming">Upcoming</button>' +
-        '<button class="vt-filter-btn" data-filter="completed">Completed</button>' +
-        '<button id="vt-mute-btn" title="Mute/unmute audio alerts (M)">&#x1f50a; Sound</button>' +
-        '<button id="vt-fullscreen-btn" title="Fullscreen mode (F)">&#x26F6; Fullscreen</button>' +
-        '<button id="vt-debug-btn" title="Toggle debug diagnostics (D)">&#x1f41b; Debug</button>' +
+        '<button class="vt-filter-btn" data-filter="completed">Done</button>' +
+        '<span class="vt-sort-wrap">' +
+          '<label for="vt-sort-select" class="vt-sort-label">Sort:</label>' +
+          '<select id="vt-sort-select">' + sortOptionsHtml + '</select>' +
+          '<button id="vt-sort-dir" title="Toggle sort direction">' +
+            (sortDirection === 'asc' ? '\u25b2' : '\u25bc') +
+          '</button>' +
+        '</span>' +
+        '<button id="vt-mute-btn" title="Mute (M)">&#x1f50a;</button>' +
+        '<button id="vt-fullscreen-btn" title="Fullscreen (F)">&#x26F6;</button>' +
+        '<button id="vt-debug-btn" title="Debug (D)">&#x1f41b;</button>' +
       '</div>' +
       '<div id="vt-debug-panel" style="display:none;"></div>' +
-      '<div id="vt-table-wrap">' +
-        '<table id="vt-table">' +
-          '<colgroup>' + TABLE_COLUMNS.map(() => '<col>').join('') + '</colgroup>' +
-          '<thead><tr>' + theadHtml + '</tr></thead>' +
-          '<tbody id="vt-tbody"></tbody>' +
-        '</table>' +
+      '<div id="vt-cards-wrap">' +
+        '<div id="vt-cards"></div>' +
         '<div id="vt-empty" style="display:none;">' +
           '<div id="vt-empty-icon">&#x1f697;</div>' +
           '<div>No bookings to display</div>' +
@@ -713,19 +722,15 @@
       });
     });
 
-    // Sortable headers
-    document.querySelectorAll('.vt-th-sortable').forEach(th => {
-      th.addEventListener('click', () => {
-        const key = th.dataset.sort;
-        if (sortColumn === key) {
-          sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-          sortColumn = key;
-          sortDirection = 'asc';
-        }
-        updateSortHeaders();
-        renderTable();
-      });
+    // Sort controls
+    document.getElementById('vt-sort-select').addEventListener('change', (e) => {
+      sortColumn = e.target.value;
+      renderTable();
+    });
+    document.getElementById('vt-sort-dir').addEventListener('click', () => {
+      sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+      document.getElementById('vt-sort-dir').textContent = sortDirection === 'asc' ? '\u25b2' : '\u25bc';
+      renderTable();
     });
 
     // Mute toggle
@@ -738,29 +743,24 @@
     document.getElementById('vt-debug-btn').addEventListener('click', toggleDebug);
 
     // Scroll tracking
-    const wrap = document.getElementById('vt-table-wrap');
+    const wrap = document.getElementById('vt-cards-wrap');
     wrap.addEventListener('scroll', () => {
       lastScrollTime = Date.now();
       document.getElementById('vt-scroll-indicator').classList.add('visible');
     });
 
-    // Row click for detail expansion
-    document.getElementById('vt-tbody').addEventListener('click', (e) => {
-      const row = e.target.closest('tr[data-id]');
-      if (!row) return;
-      const id = row.getAttribute('data-id');
-      // Toggle expansion
-      if (expandedRowId === id) {
-        expandedRowId = null;
-      } else {
-        expandedRowId = id;
-      }
+    // Card click for detail expansion (delegated)
+    document.getElementById('vt-cards').addEventListener('click', (e) => {
+      const card = e.target.closest('.vt-card[data-id]');
+      if (!card) return;
+      const id = card.getAttribute('data-id');
+      expandedRowId = expandedRowId === id ? null : id;
       renderTable();
     });
 
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
         if (e.key === 'Escape') {
           e.target.blur();
           e.preventDefault();
@@ -813,7 +813,7 @@
         muted = true;
         const btn = document.getElementById('vt-mute-btn');
         btn.classList.add('muted');
-        btn.innerHTML = '&#x1f507; Muted';
+        btn.innerHTML = '&#x1f507;';
       }
     });
   }
@@ -951,17 +951,6 @@
       diagHtml;
   }
 
-  function updateSortHeaders() {
-    document.querySelectorAll('.vt-th-sortable').forEach(th => {
-      const key = th.dataset.sort;
-      const col = TABLE_COLUMNS.find(c => c.sortKey === key);
-      const isActive = sortColumn === key;
-      th.classList.toggle('vt-th-active', isActive);
-      const arrow = isActive ? (sortDirection === 'asc' ? ' \u25b2' : ' \u25bc') : '';
-      th.textContent = (col ? col.label : key) + arrow;
-    });
-  }
-
   // ----------------------------------------------------------
   //  Render
   // ----------------------------------------------------------
@@ -1003,35 +992,50 @@
     }
   }
 
-  function buildDetailRow(b, colSpan) {
-    const fields = [
-      ['Faktur Nr',       b.fakturnr],
-      ['Taxi',            b.taxi],
-      ['Status',          b.status],
-      ['Utrop',           b.utropRaw || formatTime24(b.utrop)],
-      ['Oppmote',         b.oppmoteRaw || formatTime24(b.oppmote)],
-      ['Behandlingstid',  b.behandlingstid],
-      ['Fra',             b.fra],
-      ['Til',             b.til],
-      ['Navn',            b.navn],
-      ['Telefon',         b.tlf],
-      ['Melding til bil', b.meldingTilBil],
-      ['Betaling',        b.bet],
-      ['Egenskap',        b.egenskap],
-      ['AltTurID',        b.altturid],
-      ['TurID',           b.turid],
-    ];
+  function buildCard(b, classes, statusSlug, groupBadge, countdownHtml, taxiStyle) {
+    // Optional detail fields
+    let details = '';
+    const extras = [];
+    if (b.tlf) extras.push(esc(b.tlf));
+    if (b.egenskap) extras.push(esc(b.egenskap));
+    if (b.behandlingstid) extras.push(esc(b.behandlingstid));
+    if (b.bet) extras.push(esc(b.bet));
 
-    let inner = '<div class="vt-detail-grid">';
-    for (const [label, value] of fields) {
-      if (value) {
-        inner += '<div class="vt-detail-label">' + esc(label) + '</div>' +
-                 '<div class="vt-detail-value">' + esc(value) + '</div>';
-      }
-    }
-    inner += '</div>';
+    const extrasHtml = extras.length > 0
+      ? '<div class="vt-card-extras">' + extras.join(' &middot; ') + '</div>'
+      : '';
 
-    return '<tr class="vt-detail-row"><td colspan="' + colSpan + '">' + inner + '</td></tr>';
+    const meldingHtml = b.meldingTilBil
+      ? '<div class="vt-card-melding" title="' + escAttr(b.meldingTilBil) + '">' + esc(b.meldingTilBil) + '</div>'
+      : '';
+
+    const altHtml = b.altturid
+      ? '<span class="vt-card-alt">Alt:' + esc(b.altturid) + '</span>'
+      : '';
+
+    return '<div class="vt-card ' + classes + '" data-id="' + escAttr(b.id) + '">' +
+      '<div class="vt-card-top">' +
+        '<div class="vt-card-times">' +
+          '<span class="vt-utrop-time">' + formatTime24(b.utrop) + '</span>' +
+          '<span class="vt-time-arrow">\u2192</span>' +
+          '<span class="vt-oppmote-time">' + formatTime24(b.oppmote) + '</span>' +
+          countdownHtml +
+        '</div>' +
+        '<span class="vt-taxi-num"' + taxiStyle + '>' + esc(b.taxi) + '</span>' +
+        groupBadge +
+        '<span class="vt-status-badge vt-status--' + statusSlug + '">' + esc(b.status) + '</span>' +
+      '</div>' +
+      '<div class="vt-card-addr">' +
+        '<div class="vt-card-fra"><span class="vt-addr-label">FRA</span> ' + esc(b.fra) + '</div>' +
+        '<div class="vt-card-til"><span class="vt-addr-label">TIL</span> ' + esc(b.til) + '</div>' +
+      '</div>' +
+      '<div class="vt-card-bottom">' +
+        '<span class="vt-card-navn">' + esc(b.navn) + '</span>' +
+        extrasHtml +
+        altHtml +
+      '</div>' +
+      meldingHtml +
+    '</div>';
   }
 
   function renderTable() {
@@ -1042,11 +1046,11 @@
     updateStatusIndicator();
     if (debugVisible) renderDebugPanel();
 
-    const tbody = document.getElementById('vt-tbody');
+    const container = document.getElementById('vt-cards');
     const empty = document.getElementById('vt-empty');
 
     if (displayed.length === 0) {
-      tbody.innerHTML = '';
+      container.innerHTML = '';
       empty.style.display = 'flex';
       return;
     }
@@ -1078,7 +1082,6 @@
       }
     }
 
-    const colCount = TABLE_COLUMNS.length;
     let html = '';
     for (let i = 0; i < displayed.length; i++) {
       const b = displayed[i];
@@ -1086,7 +1089,6 @@
       const ids = isGrouped ? altGroups[b.altturid] : [];
       const isFirst = isGrouped && ids.indexOf(b.id) === 0;
       const isLast = isGrouped && ids.indexOf(b.id) === ids.length - 1;
-      const isExpanded = expandedRowId === b.id;
 
       let rClass = rowClass(b);
       if (isGrouped && groupActive[b.altturid] && rClass === 'vt-row--completed') {
@@ -1097,40 +1099,24 @@
       if (isGrouped) classes += ' vt-group-member';
       if (isFirst) classes += ' vt-group-start';
       if (isLast) classes += ' vt-group-end';
-      if (newIds.has(b.id)) classes += ' vt-row-new';
-      if (isExpanded) classes += ' vt-row-expanded';
-      classes += ' vt-row-enter';
+      if (newIds.has(b.id)) classes += ' vt-card-new';
+      classes += ' vt-card-enter';
 
       const statusSlug = statusBadgeClass(b.status);
       const groupBadge = isGrouped ? '<span class="vt-group-badge">G</span>' : '';
 
-      // Countdown for upcoming bookings
       const countdown = isUpcoming(b.utrop) ? formatCountdown(b.utrop) : '';
       const countdownHtml = countdown
         ? '<span class="vt-countdown">' + countdown + '</span>'
         : '';
 
-      // Color-coded taxi number
       const tColor = taxiColor(b.taxi);
       const taxiStyle = tColor ? ' style="color:' + tColor + '"' : '';
 
-      html += '<tr class="' + classes + '" data-id="' + escAttr(b.id) + '" title="Click for details">' +
-        '<td><span class="vt-utrop-time">' + formatTime24(b.utrop) + '</span>' + countdownHtml + '</td>' +
-        '<td><span class="vt-oppmote-time">' + formatTime24(b.oppmote) + '</span></td>' +
-        '<td><span class="vt-taxi-num"' + taxiStyle + '>' + esc(b.taxi) + '</span>' + groupBadge + '</td>' +
-        '<td class="vt-cell-truncate" title="' + escAttr(b.navn) + '">' + esc(b.navn) + '</td>' +
-        '<td class="vt-cell-truncate" title="' + escAttr(b.fra) + '">' + esc(b.fra) + '</td>' +
-        '<td class="vt-cell-truncate" title="' + escAttr(b.til) + '">' + esc(b.til) + '</td>' +
-        '<td><span class="vt-status-badge vt-status--' + statusSlug + '">' + esc(b.status) + '</span></td>' +
-        '</tr>';
-
-      // Expanded detail row
-      if (isExpanded) {
-        html += buildDetailRow(b, colCount);
-      }
+      html += buildCard(b, classes, statusSlug, groupBadge, countdownHtml, taxiStyle);
     }
 
-    tbody.innerHTML = html;
+    container.innerHTML = html;
     previousBookingIds = currentIds;
 
     if (newIds.size > 0 && parseCount > 1) {
@@ -1217,11 +1203,11 @@
     const ind = document.getElementById('vt-scroll-indicator');
     if (ind) ind.classList.remove('visible');
 
-    const row = document.querySelector(
-      '#vt-tbody .vt-row--sending, #vt-tbody .vt-row--upcoming, #vt-tbody .vt-row--manual, #vt-tbody .vt-row--active'
+    const card = document.querySelector(
+      '#vt-cards .vt-row--sending, #vt-cards .vt-row--upcoming, #vt-cards .vt-row--manual, #vt-cards .vt-row--active'
     );
-    if (row) {
-      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (card) {
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }
 
