@@ -91,6 +91,48 @@
     .shortcuts span {
       color: #6b7a94;
     }
+    /* API settings */
+    .api-field { margin-bottom: 8px; }
+    .api-field label {
+      display: block;
+      font-size: 11px;
+      color: #6b7a94;
+      margin-bottom: 3px;
+    }
+    .api-field input {
+      width: 100%;
+      padding: 5px 8px;
+      border-radius: 4px;
+      border: 1px solid #1e2536;
+      background: #161b28;
+      color: #d4d8e0;
+      font-size: 12px;
+      font-family: monospace;
+      outline: none;
+    }
+    .api-field input:focus { border-color: #3b82f6; }
+    .api-field input::placeholder { color: #374151; }
+    .api-btns {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-top: 8px;
+    }
+    .api-btns button {
+      padding: 4px 12px;
+      border-radius: 4px;
+      border: 1px solid #1e2536;
+      background: #1d4ed8;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .api-btns button:hover { background: #2563eb; }
+    #api-status {
+      font-size: 11px;
+      color: #6b7a94;
+    }
     .footer {
       margin-top: 16px;
       text-align: center;
@@ -141,8 +183,28 @@
       <kbd>Esc</kbd>   <span>Toggle overlay</span>
       <kbd>M</kbd>     <span>Mute/unmute audio</span>
       <kbd>F</kbd>     <span>Fullscreen mode</span>
+      <kbd>L</kbd>     <span>Toggle sidebar</span>
+      <kbd>R</kbd>     <span>Rotate display</span>
+      <kbd>D</kbd>     <span>Debug panel</span>
       <kbd>Ctrl+F</kbd><span>Focus search</span>
       <kbd>1-5</kbd>   <span>Switch filter tabs</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">API Forward</div>
+    <div class="api-field">
+      <label for="api-url">Endpoint URL</label>
+      <input type="url" id="api-url" placeholder="https://your-app.com/api/bookings" />
+    </div>
+    <div class="api-field">
+      <label for="api-key">API Key</label>
+      <input type="password" id="api-key" placeholder="your-api-key" />
+    </div>
+    <div class="api-btns">
+      <button id="api-save">Save</button>
+      <button id="api-test" style="background:#161b28;color:#93a3bf;">Test</button>
+      <span id="api-status"></span>
     </div>
   </div>
 

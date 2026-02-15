@@ -29,4 +29,61 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  // --- API Forward settings ---
+  const apiUrlInput = document.getElementById('api-url');
+  const apiKeyInput = document.getElementById('api-key');
+  const apiStatus = document.getElementById('api-status');
+
+  // Load saved settings
+  chrome.storage.local.get(['vtApiUrl', 'vtApiKey'], (r) => {
+    if (r.vtApiUrl) apiUrlInput.value = r.vtApiUrl;
+    if (r.vtApiKey) apiKeyInput.value = r.vtApiKey;
+  });
+
+  // Save
+  document.getElementById('api-save').addEventListener('click', () => {
+    const url = apiUrlInput.value.trim();
+    const key = apiKeyInput.value.trim();
+    chrome.storage.local.set({ vtApiUrl: url, vtApiKey: key }, () => {
+      apiStatus.textContent = 'Saved';
+      apiStatus.style.color = '#86efac';
+      setTimeout(() => { apiStatus.textContent = ''; }, 2000);
+    });
+  });
+
+  // Test
+  document.getElementById('api-test').addEventListener('click', () => {
+    const url = apiUrlInput.value.trim();
+    const key = apiKeyInput.value.trim();
+    if (!url) {
+      apiStatus.textContent = 'Enter a URL first';
+      apiStatus.style.color = '#fca5a5';
+      return;
+    }
+    apiStatus.textContent = 'Testing...';
+    apiStatus.style.color = '#fbbf24';
+
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(key ? { 'X-API-Key': key } : {}),
+      },
+      body: JSON.stringify({ test: true, source: 'voss-taxi-wallboard', timestamp: new Date().toISOString() }),
+    })
+    .then((res) => {
+      if (res.ok) {
+        apiStatus.textContent = 'OK (' + res.status + ')';
+        apiStatus.style.color = '#86efac';
+      } else {
+        apiStatus.textContent = 'Error ' + res.status;
+        apiStatus.style.color = '#fca5a5';
+      }
+    })
+    .catch((err) => {
+      apiStatus.textContent = err.message || 'Failed';
+      apiStatus.style.color = '#fca5a5';
+    });
+  });
 });

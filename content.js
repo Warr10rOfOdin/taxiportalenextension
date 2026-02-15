@@ -1273,6 +1273,41 @@
   }
 
   // ----------------------------------------------------------
+  //  API Forward — send booking data to external endpoint
+  // ----------------------------------------------------------
+  function forwardToApi() {
+    if (bookings.length === 0) return;
+    try {
+      const payload = {
+        source: 'voss-taxi-wallboard',
+        timestamp: new Date().toISOString(),
+        bookingCount: bookings.length,
+        bookings: bookings.map(b => ({
+          id: b.id,
+          fakturnr: b.fakturnr || null,
+          turid: b.turid || null,
+          taxi: b.taxi || null,
+          status: b.status || null,
+          utrop: b.utrop ? b.utrop.toISOString() : null,
+          oppmote: b.oppmote ? b.oppmote.toISOString() : null,
+          fra: b.fra || null,
+          til: b.til || null,
+          navn: b.navn || null,
+          tlf: b.tlf || null,
+          egenskap: b.egenskap || null,
+          behandlingstid: b.behandlingstid || null,
+          bet: b.bet || null,
+          meldingTilBil: b.meldingTilBil || null,
+          altturid: b.altturid || null,
+        })),
+      };
+      chrome.runtime.sendMessage({ type: 'vtApiForward', payload }, () => {
+        if (chrome.runtime.lastError) { /* ignore — no listener or context invalid */ }
+      });
+    } catch (_) { /* ignore errors — API forward is best-effort */ }
+  }
+
+  // ----------------------------------------------------------
   //  Main update loop
   // ----------------------------------------------------------
   function update() {
@@ -1285,6 +1320,7 @@
       renderTable();
       checkUnderSendingChime();
       updateBadge();
+      forwardToApi();
     }
 
     checkUtropChimes();
